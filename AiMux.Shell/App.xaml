@@ -1,0 +1,31 @@
+﻿<p:PrismApplication x:Class="AiMux.Shell.App"
+                    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:p="http://prismlibrary.com/"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                    xmlns:converter="clr-namespace:AiMux.Shell.Converter">
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- 通用值转换器 -->
+            <BooleanToVisibilityConverter x:Key="BoolToVisConverter" />
+            <converter:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisConverter" />
+            <converter:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <converter:BoolToHorizontalAlignmentConverter x:Key="BoolToAlignmentConverter" />
+            <converter:BoolToDoubleConverter x:Key="BoolToDoubleConverter" />
+            <converter:HotkeyActionDescConverter x:Key="HotkeyActionDescConverter" />
+
+            <!-- 全局字体：作用于所有 TextBlock，避免默认 Segoe UI 中文回退不一致 -->
+            <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+            </Style>
+
+            <ResourceDictionary.MergedDictionaries>
+                <!-- WPF-UI Fluent 主题基座 -->
+                <ui:ThemesDictionary Theme="Light" />
+                <ui:ControlsDictionary />
+                <!-- 复刻界面原型的自定义样式与设计 token -->
+                <ResourceDictionary Source="Styles/SidebarStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</p:PrismApplication>

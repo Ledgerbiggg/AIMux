@@ -1,0 +1,124 @@
+<UserControl x:Class="AiMux.Shell.Views.Settings.SettingsAboutView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:vm="clr-namespace:AiMux.Shell.ViewModels.Settings"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:SettingsAboutViewModel}">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,24,0,0" HorizontalAlignment="Center" MaxWidth="560">
+
+            <!-- App Icon -->
+            <Border Width="80" Height="80" CornerRadius="20"
+                    Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1">
+                <ui:SymbolIcon Symbol="Apps24" FontSize="38"
+                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+            </Border>
+
+            <TextBlock Text="AiMux" FontSize="28" FontWeight="Bold"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                       HorizontalAlignment="Center" Margin="0,16,0,4" />
+            <TextBlock Text="{Binding Version, StringFormat='v{0}', Mode=OneWay}"
+                       FontSize="14" HorizontalAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+
+            <TextBlock Margin="0,12,0,0" FontSize="13" TextWrapping="Wrap" TextAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                AI 聊天平台聚合桌面客户端
+                <LineBreak />
+                将多个 AI 网页平台统一收纳到系统托盘，
+                <LineBreak />
+                支持全局热键呼出、窗口尺寸记忆与外观自定义。
+            </TextBlock>
+
+            <!-- Action Buttons -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,22,0,0">
+                <ui:Button Appearance="Primary" Command="{Binding OpenGitHubCommand}"
+                          Padding="20,8" FontSize="13">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Code24" FontSize="15" VerticalAlignment="Center" Margin="0,0,7,0" />
+                        <TextBlock Text="GitHub 仓库" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ui:Button>
+
+                <ui:Button Appearance="Secondary" Command="{Binding CheckCommand}"
+                          IsEnabled="{Binding IsChecking, Converter={StaticResource InverseBoolConverter}}"
+                          Padding="20,8" FontSize="13" Margin="10,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="ArrowSync24" FontSize="15" VerticalAlignment="Center" Margin="0,0,7,0" />
+                        <TextBlock Text="检查更新" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ui:Button>
+            </StackPanel>
+
+            <!-- Update Status -->
+            <TextBlock Margin="0,10,0,0" FontSize="12" HorizontalAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                       Text="{Binding Status}" Visibility="{Binding IsChecking, Converter={StaticResource BoolToVisConverter}}" />
+
+            <!-- Info Card -->
+            <Border Margin="0,26,0,0" Padding="22,18" CornerRadius="10"
+                    Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="项目信息" FontWeight="SemiBold" FontSize="13"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,12" />
+
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="72" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8">仓库地址</TextBlock>
+                        <TextBlock Grid.Row="0" Grid.Column="1" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8">
+                            <Hyperlink NavigateUri="{Binding GitHubUrl}" RequestNavigate="OnGitHubLinkClick"
+                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}">
+                                <Run Text="{Binding GitHubUrl}" />
+                            </Hyperlink>
+                        </TextBlock>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8">当前版本</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="1" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8"
+                                   Text="{Binding Version, Mode=OneWay}" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8">开源协议</TextBlock>
+                        <TextBlock Grid.Row="2" Grid.Column="1" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8">MIT License</TextBlock>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}">技术栈</TextBlock>
+                        <TextBlock Grid.Row="3" Grid.Column="1" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+                            .NET 9 / WPF / Prism / WPF-UI / WebView2
+                        </TextBlock>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Footer -->
+            <TextBlock Margin="0,18,0,28" FontSize="11" TextWrapping="Wrap" TextAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorQuaternaryBrush}">
+                检查更新会从 GitHub Releases 读取版本信息，不会收集任何个人信息。
+                <LineBreak />
+                Made with ♥ by Ledgerbiggg
+            </TextBlock>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

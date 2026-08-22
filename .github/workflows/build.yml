@@ -1,0 +1,98 @@
+name: Build and Release
+
+# 工作流职责：云端打包安装包并发布到 GitHub Release。
+# 触发：push 到 main（版本号变更时自动出包）。
+# 流程：读 csproj <Version> -> 若对应 Release(tag vX.Y.Z) 已存在则跳过 ->
+#       否则 dotnet publish + Inno Setup 打包 -> 创建 Release 并上传安装包，
+#       Release 说明(note)取自仓库根 version.json 的 notes 字段。
+#
+# 开发者本地只需: 改代码 -> make release (升版本号 + 写 version.json notes) -> git push
+# 其余打包/发布由本工作流完成。安装包不进 git（仓库保持干净）。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Read version from csproj
+        id: ver
+        shell: bash
+        run: |
+          VER=$(grep -oP '(?<=<Version>)[^<]+' AiMux.Shell/AiMux.Shell.csproj)
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Version in csproj: $VER"
+
+      - name: Read release notes from version.json
+        shell: bash
+        run: |
+          echo "=== version.json content (debug) ==="
+          cat version.json
+          echo "====================================="
+          # 提取 notes 字段值（去掉首尾引号）
+          NOTES=$(sed -n 's/.*"notes": *"\([^"]*\)".*/\1/p' version.json | head -1)
+          # 将 JSON 中的字面 \n 转为真实换行符，使 GitHub Release 正确渲染 Markdown
+          echo "${NOTES}" | sed 's/\\n/\n/g' > release_notes.txt
+          echo "Release notes -> release_notes.txt:"
+          cat release_notes.txt
+
+      - name: Skip if Release already exists
+        id: check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.ver.outputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, skipping build."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish (self-contained)
+        if: steps.check.outputs.exists == 'false'
+        shell: bash
+        run: |
+          dotnet publish AiMux.Shell/AiMux.Shell.csproj -c Release \
+            -r win-x64 --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o _publish
+
+      - name: Build installer with Inno Setup Action
+        if: steps.check.outputs.exists == 'false'
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: installer.iss
+          options: /DMyAppVersion=${{ steps.ver.outputs.version }}
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER="${{ steps.ver.outputs.version }}"
+          TAG="v$VER"
+          EXE="package/AiMux-Setup-$VER.exe"
+          gh release create "$TAG" "$EXE" \
+            --title "AiMux $VER" \
+            --notes-file release_notes.txt
+
+      - name: Done (skipped)
+        if: steps.check.outputs.exists == 'true'
+        run: echo "Release v${{ steps.ver.outputs.version }} already published; nothing to do."

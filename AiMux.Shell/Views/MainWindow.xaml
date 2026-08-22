@@ -1,0 +1,171 @@
+﻿<ui:FluentWindow x:Class="AiMux.Shell.Views.MainWindow"
+                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                  WindowBackdropType="Mica"
+                  WindowCornerPreference="Default"
+                  WindowStartupLocation="CenterScreen"
+                  ExtendsContentIntoTitleBar="True"
+                  Title="{Binding Title}"
+                  Height="760" Width="1180"
+                  MinHeight="480" MinWidth="420"
+                  SizeChanged="MainWindow_OnSizeChanged"
+                  Closing="MainWindow_OnClosing"
+                  Closed="MainWindow_OnClosed">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 标题栏：WPF-UI 4.0 的 TitleBar.Icon 是 IconSource 类型，不接受 DrawingImage，暂不设置图标避免崩溃 -->
+        <ui:TitleBar x:Name="TitleBar" Grid.Row="0" Title="{Binding Title}"
+                     CloseWindowByDoubleClickOnIcon="True" />
+
+        <!-- 主体：侧边栏 + 内容区 -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 左侧边栏：折叠态(60)只显示图标，展开态(224)显示图标+平台名。宽度由 IsSidebarCollapsed 驱动并带动画 -->
+            <Border x:Name="SidebarBorder" Grid.Column="0"
+                    Width="{Binding IsSidebarCollapsed, Converter={StaticResource BoolToDoubleConverter}, ConverterParameter='224,60'}"
+                    Background="{DynamicResource ApplicationBackgroundBrush}"
+                    BorderBrush="{DynamicResource ControlElevationBorderBrush}" BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- 品牌区：左侧折叠按钮(始终显示) + 图标；展开态额外显示名称 -->
+                    <Grid Grid.Row="0" Height="56" Margin="8,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <!-- 折叠 / 展开侧边栏按钮：始终显示 -->
+                        <Button Grid.Column="0" Style="{StaticResource TopBarButtonStyle}"
+                                Command="{Binding ToggleSidebarCommand}"
+                                Width="32" Height="32" Padding="0" ToolTip="折叠 / 展开侧边栏">
+                            <TextBlock Text="☰" FontSize="15"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                        <!-- 版本号：替换原来的 AI Chat Hub 品牌文字，放在侧边栏顶部醒目位置 -->
+                        <TextBlock Grid.Column="1" Text="{Binding Version, StringFormat='v{0}'}"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   VerticalAlignment="Center" Margin="8,0,0,0"
+                                   Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InverseBoolToVisConverter}}" />
+                    </Grid>
+
+                    <!-- 平台列表：折叠态只显示图标(居中)，展开态显示图标+平台名(靠左)。拖拽排序已在外层处理 -->
+                    <Grid Grid.Row="1" Margin="0,4,0,4">
+                        <ListBox ItemsSource="{Binding Platforms}"
+                                 SelectedItem="{Binding SelectedPlatform, Mode=TwoWay}"
+                                 ItemContainerStyle="{StaticResource SidebarItemStyle}"
+                                 Background="Transparent" BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 HorizontalAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource BoolToAlignmentConverter}}"
+                                 AllowDrop="True"
+                                 PreviewMouseLeftButtonDown="PlatformsList_PreviewMouseLeftButtonDown"
+                                 PreviewMouseMove="PlatformsList_PreviewMouseMove"
+                                 DragOver="PlatformsList_DragOver"
+                                 Drop="PlatformsList_Drop">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <!-- 图标：无背景色，透明，固定 28 外框 / 24 图像，避免被压缩遮挡 -->
+                                        <Border Grid.Column="0" Width="28" Height="28" CornerRadius="7" Background="Transparent">
+                                            <Grid>
+                                                <TextBlock Text="{Binding Initial}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontSize="12"
+                                                           FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <Image Source="{Binding IconSource}" Width="24" Height="24" Stretch="Uniform"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <Image.Clip>
+                                                        <RectangleGeometry Rect="0,0,24,24" RadiusX="5" RadiusY="5" />
+                                                    </Image.Clip>
+                                                </Image>
+                                            </Grid>
+                                        </Border>
+                                        <!-- 平台名称：展开态显示，折叠态隐藏 -->
+                                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13.5"
+                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="12,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource InverseBoolToVisConverter}}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+
+                    <!-- 底部设置入口：折叠态只图标，展开态图标+“设置”文字 -->
+                    <Button Grid.Row="2" Style="{StaticResource SidebarFootButtonStyle}"
+                            Command="{Binding OpenSettingsCommand}" Margin="8,0,8,8"
+                            HorizontalAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource BoolToAlignmentConverter}}">
+                        <StackPanel Orientation="Horizontal" Height="30" VerticalAlignment="Center">
+                            <Border Width="28" Height="28" CornerRadius="7" Background="Transparent">
+                                <TextBlock Text="⚙" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="设置" FontSize="13.5" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="12,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InverseBoolToVisConverter}}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- 右侧内容区：web-nav / WebView / 提示条 -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- 浏览器式导航条 -->
+                <Border Grid.Row="0" Background="{DynamicResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource ControlElevationBorderBrush}" BorderThickness="0,0,0,1">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="6,0,14,0" Height="44">
+                        <!-- 缩放按钮：切换窗口大 / 小尺寸，并联动侧边栏（缩小收起、放大展开） -->
+                        <Button x:Name="CompactToggleButton" Style="{StaticResource TopBarButtonStyle}" Click="ToggleCompact_Click"
+                                Width="34" Height="34" Padding="0" Margin="2,0,0,0"
+                                ToolTip="放大 / 缩小窗口（并收起 / 展开侧边栏）">
+                            <TextBlock x:Name="CompactToggleIcon" Text="↗" FontSize="14"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                        <!-- 刷新当前网页 -->
+                        <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding ReloadCommand}"
+                                Width="34" Height="34" Padding="0" Margin="4,0,0,0">
+                            <TextBlock Text="↻" FontSize="15" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                        <!-- 右上角主题切换：浅色 / 深色一键切换并保存 -->
+                        <Button x:Name="ThemeToggleButton" Style="{StaticResource TopBarButtonStyle}" Click="ThemeToggle_Click"
+                                Width="34" Height="34" Padding="0" Margin="4,0,0,0"
+                                ToolTip="切换浅色 / 深色主题">
+                            <TextBlock x:Name="ThemeToggleIcon" Text="🌙" FontSize="14"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- WebView2 内容区：多平台实例叠放，切换时 Visibility 控制，不销毁保留上下文。
+                     在右侧 / 下侧 / 右下角 6px 内拦截鼠标，实现整屏缩放（绕过 WebView 吞掉系统 resize） -->
+                <Grid x:Name="WebViewContainer" Grid.Row="1" Background="{DynamicResource ControlFillColorDefaultBrush}"
+                      PreviewMouseMove="WebViewContainer_PreviewMouseMove"
+                      PreviewMouseLeftButtonDown="WebViewContainer_PreviewMouseLeftButtonDown"
+                      PreviewMouseLeftButtonUp="WebViewContainer_PreviewMouseLeftButtonUp" />
+            </Grid>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

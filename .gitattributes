@@ -1,0 +1,11 @@
+# 统一换行符为 CRLF（Windows 项目），避免 Git 警告
+* text=auto eol=crlf
+
+# 二进制资源不转换
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.exe binary
+*.dll binary

@@ -1,0 +1,66 @@
+﻿<ui:FluentWindow x:Class="AiMux.Shell.Views.SettingsWindow"
+                    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                    xmlns:vm="clr-namespace:AiMux.Shell.ViewModels.Settings"
+                    xmlns:views="clr-namespace:AiMux.Shell.Views.Settings"
+                    WindowBackdropType="Mica"
+                    WindowStartupLocation="CenterOwner"
+                    ExtendsContentIntoTitleBar="True"
+                    Title="设置"
+                    Width="1000" Height="760"
+                    MinWidth="820" MinHeight="620">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 标题栏：WPF-UI 4.0 的 TitleBar.Icon 是 IconSource 类型，不接受 DrawingImage，暂不设置图标避免崩溃 -->
+        <ui:TitleBar Grid.Row="0" Title="设置" CloseWindowByDoubleClickOnIcon="True" />
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="162" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 左侧设置导航 -->
+            <Border Grid.Column="0" Background="{DynamicResource ApplicationBackgroundBrush}"
+                    BorderBrush="{DynamicResource ControlElevationBorderBrush}" BorderThickness="0,0,1,0" Padding="8,12">
+                <ListBox ItemsSource="{Binding NavItems}" SelectedItem="{Binding SelectedNav}"
+                         ItemContainerStyle="{StaticResource SettingsNavItemStyle}"
+                         Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" FontSize="13" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+
+            <!-- 右侧面板：按 VM 类型自动匹配 -->
+            <Border Grid.Column="1" Background="{DynamicResource ApplicationBackgroundBrush}">
+                <ContentControl Content="{Binding CurrentPanel}">
+                    <ContentControl.Resources>
+                        <DataTemplate DataType="{x:Type vm:SettingsPlatformViewModel}">
+                            <views:SettingsPlatformView />
+                        </DataTemplate>
+                        <DataTemplate DataType="{x:Type vm:SettingsGeneralViewModel}">
+                            <views:SettingsGeneralView />
+                        </DataTemplate>
+                        <DataTemplate DataType="{x:Type vm:SettingsHotkeyViewModel}">
+                            <views:SettingsHotkeyView />
+                        </DataTemplate>
+                        <DataTemplate DataType="{x:Type vm:SettingsAppearanceViewModel}">
+                            <views:SettingsAppearanceView />
+                        </DataTemplate>
+                        <DataTemplate DataType="{x:Type vm:SettingsAboutViewModel}">
+                            <views:SettingsAboutView />
+                        </DataTemplate>
+                    </ContentControl.Resources>
+                </ContentControl>
+            </Border>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

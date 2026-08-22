@@ -1,0 +1,92 @@
+# ============================================================
+# AiMux .gitignore  (Windows / .NET 9 WPF)
+# ============================================================
+
+# ---- 编译产物 ----
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]lease/
+[Aa]rtifacts/
+x64/
+x86/
+[Aa]rm/
+[Aa]rm64/
+
+# ---- IDE / 编辑器 ----
+.vs/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.DotSettings.user
+*.rsuser
+
+# ---- 语言/工具缓存（Visual Studio / Rider / Resharper）----
+**/*.cache
+*.cache
+*.resharper
+_ReSharper*/
+*.DotSettings
+
+# ---- 运行时生成文件 ----
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.meta
+*.obj
+*.pch
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.log
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# ---- NuGet ----
+.nuget/
+packages/
+*.nupkg
+
+# ---- 测试 / 覆盖 ----
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+[Cc]overage*/
+
+# ---- 发布输出（安装包不进 git，由 GitHub 工作流云端打包并发布到 Release）----
+publish/
+_publish/
+package/
+# 版本号自增脚本的临时产物
+version.tmp
+# 工作流临时生成的 release notes
+release_notes.txt
+
+# ---- 用户本地配置 / 日志（运行时写入 AppData 或程序目录）----
+*.user.config
+logs/
+*.db
+
+# ---- 操作系统 ----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# ---- 机密 / 环境变量 ----
+.env
+*.secret
+secrets.json

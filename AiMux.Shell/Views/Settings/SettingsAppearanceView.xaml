@@ -1,0 +1,18 @@
+<UserControl x:Class="AiMux.Shell.Views.Settings.SettingsAppearanceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Margin="24,20,24,20" MaxWidth="520" HorizontalAlignment="Left">
+        <TextBlock Style="{StaticResource PanelTitleStyle}" Text="外观" />
+        <TextBlock Style="{StaticResource PanelSubStyle}" Margin="0,4,0,0"
+                   Text="界面主题偏好。" />
+
+        <StackPanel Margin="0,18,0,0">
+            <TextBlock Style="{StaticResource FormLabelStyle}" Text="主题" />
+            <RadioButton GroupName="Theme" Content="浅色（默认）" IsChecked="{Binding IsLight}" />
+            <RadioButton GroupName="Theme" Content="深色" IsChecked="{Binding IsDark}" Margin="0,10,0,0" />
+
+            <Button Style="{StaticResource MiniPrimaryButtonStyle}" Command="{Binding SaveCommand}"
+                    Content="应用" Padding="24,6" Margin="0,22,0,0" HorizontalAlignment="Left" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>
