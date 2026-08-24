@@ -37,7 +37,8 @@ ISCC     ?= "D:\Inno Setup 7\ISCC.exe"
 # 发布时默认升版本号的方式：patch（0.6.0 -> 0.6.1 ... 0.6.9 -> 0.7.0 进位）。可覆盖：make MAJOR=1 / make MINOR=1
 BUMP_PART ?= patch
 
-.DEFAULT_GOAL := help
+# 默认目标：热部署（直接 make 即进入监听重建模式，修改代码自动重启）
+.DEFAULT_GOAL := watch
 
 # 杀掉残留的 AiMux 进程（避免锁文件导致构建失败 / 单实例 Mutex 抢占）
 .PHONY: kill
@@ -141,6 +142,8 @@ logs:
 .PHONY: help
 help:
 	@echo "AiMux - AI 聊天平台聚合桌面客户端"
+	@echo.
+	@echo "默认目标: make = make watch（热部署，Q 退出）"
 	@echo.
 	@echo "可用目标:"
 	@echo "  dev        - 一键启动：杀进程 + 构建 + 运行（最常用）"
