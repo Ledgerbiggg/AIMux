@@ -8,6 +8,9 @@ public static class LoggerHelper
     private static readonly object Lock = new();
     private static string _logDir = Path.Combine(AppContext.BaseDirectory, "logs");
 
+    /// <summary>当前日志目录（供异常弹窗提示日志位置等场景使用）</summary>
+    public static string LogDir => _logDir;
+
     /// <summary>设置日志目录（应用启动时由 ConfigService.LogsDir 传入）</summary>
     public static void SetLogDir(string dir) => _logDir = dir;
 

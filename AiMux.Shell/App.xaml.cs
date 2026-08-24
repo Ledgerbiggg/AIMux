@@ -8,6 +8,7 @@ using AiMux.Models;
 using AiMux.Common.Logger;
 using AiMux.Services.IService;
 using AiMux.Services.Service;
+using AiMux.Shell.Util;
 using AiMux.Shell.ViewModels;
 using AiMux.Shell.ViewModels.Settings;
 using AiMux.Shell.Views;
@@ -27,17 +28,19 @@ public partial class App : PrismApplication
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        // 全局异常兜底：记录日志 + dump 完整堆栈到桌面文件，方便定位闪退
+        // 全局异常兜底：记录日志 + 弹窗提示，完整堆栈写入日志目录（不写桌面）
         DispatcherUnhandledException += (_, args) =>
         {
             DumpCrash(args.Exception, "UI 线程未处理异常");
             LoggerHelper.Error("UI 线程未处理异常", args.Exception);
+            ShowCrashDialog(args.Exception, "UI 线程未处理异常");
             args.Handled = true; // 吞掉，不让程序闪退
         };
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
             DumpCrash(args.ExceptionObject as Exception, "AppDomain 未处理异常");
             LoggerHelper.Error("AppDomain 未处理异常", args.ExceptionObject as Exception);
+            ShowCrashDialog(args.ExceptionObject as Exception, "AppDomain 未处理异常");
         };
 
         // 单实例：二次启动时通知已运行实例呼出窗口，自身退出
@@ -63,16 +66,40 @@ public partial class App : PrismApplication
         base.OnExit(e);
     }
 
+    /// <summary>弹窗防递归标志：弹窗自身触发的渲染/布局异常会被全局处理器再次捕获，避免死循环</summary>
+    private static bool _isShowingCrashDialog;
+
+    /// <summary>弹出未处理异常提示框，详情完整堆栈已在日志中（日志位置一并告知用户）</summary>
+    private static void ShowCrashDialog(Exception? ex, string tag)
+    {
+        if (_isShowingCrashDialog)
+            return;
+        _isShowingCrashDialog = true;
+        try
+        {
+            var detail = ex is null ? "（无异常对象）" : $"{ex.GetType().Name}: {ex.Message}";
+            var msg = $"{tag}：\n\n{detail}\n\n详细信息已写入日志：{LoggerHelper.LogDir}";
+            _ = MessageBoxHelper.Error(msg, "AiMux 异常提示")
+                .ContinueWith(_ => _isShowingCrashDialog = false,
+                    TaskScheduler.FromCurrentSynchronizationContext());
+        }
+        catch
+        {
+            // 弹窗失败就放弃，绝不在异常处理里再抛异常
+            _isShowingCrashDialog = false;
+        }
+    }
+
     /// <summary>
-    /// 把未处理异常完整堆栈写到桌面 AiMux-crash.txt，方便用户/开发定位闪退原因。
+    /// 把未处理异常完整堆栈写入日志目录 crash.log（不写桌面），方便定位闪退原因。
     /// 任何未能被吞掉的异常都会留下痕迹，不会再“看不到报错”。
     /// </summary>
     private static void DumpCrash(Exception? ex, string tag)
     {
         try
         {
-            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            var path = Path.Combine(desktop, "AiMux-crash.txt");
+            Directory.CreateDirectory(LoggerHelper.LogDir);
+            var path = Path.Combine(LoggerHelper.LogDir, "crash.log");
             var sb = new StringBuilder();
             sb.AppendLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {tag}");
             sb.AppendLine(ex?.ToString() ?? "（无异常对象）");
@@ -81,7 +108,7 @@ public partial class App : PrismApplication
         }
         catch
         {
-            // 写桌面失败就放弃，绝不在异常处理里再抛异常
+            // 写日志失败就放弃，绝不在异常处理里再抛异常
         }
     }
 

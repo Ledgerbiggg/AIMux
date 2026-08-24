@@ -84,9 +84,9 @@
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8">仓库地址</TextBlock>
                         <TextBlock Grid.Row="0" Grid.Column="1" FontSize="12"
                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8">
-                            <Hyperlink NavigateUri="{Binding GitHubUrl}" RequestNavigate="OnGitHubLinkClick"
+                            <Hyperlink NavigateUri="{Binding GitHubUrl, Mode=OneWay}" RequestNavigate="OnGitHubLinkClick"
                                        Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}">
-                                <Run Text="{Binding GitHubUrl}" />
+                                <Run Text="{Binding GitHubUrl, Mode=OneWay}" />
                             </Hyperlink>
                         </TextBlock>
 

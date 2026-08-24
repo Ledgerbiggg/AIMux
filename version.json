@@ -1,1 +1,5 @@
-﻿{"version": "0.0.1", "notes": "## v0.0.1 功能介绍\n\nAiMux 是一个轻量、可定制、常驻系统托盘的 AI 多平台聚合桌面客户端（基于 WPF + .NET 9）。\n\n### ✨ 核心功能\n- 🧠 多平台聚合：内置 ChatGPT / DeepSeek / 通义千问（Qwen）等多个平台，左侧列表一键切换\n- 🪟 小屏 / 大屏双模式：预置两套窗口尺寸，一键切换并自动居中\n- 📌 托盘常驻：关闭主窗口后最小化到系统托盘，单击托盘图标即唤起主界面\n- ⌨️ 应用内快捷键：窗口切换、尺寸切换、侧栏折叠、设置面板、平台上下切换均可自定义\n- 💾 配置导入 / 导出：一键导出 .aimux 配置文件（含平台列表与全部设置），换电脑一键恢复\n- 🎨 外观自定义：主色、主题等外观设置立即生效\n- 🔁 开机自启：设置中开启后写入注册表，随系统启动\n- 🔍 检查更新：设置-关于页可检测新版本并跳转下载\n\n### 🧩 技术栈\n- .NET 9 + WPF + Prism.Unity + WPF-UI 4.0 + WebView2\n- 自包含单文件发布，用户无需单独安装 .NET 运行时", "url": "https://github.com/Ledgerbiggg/AIMux/releases/latest"}
+﻿{
+  "version": "0.0.2",
+  "notes": "## v0.0.2 更新说明\n> 生成时间：2026-08-24 23:01\n\n### ✨ 新功能\n- 全局未处理异常弹窗提示：不再静默吞错，异常详情自动写入日志目录\n- 新增 Qoder 项目技能：/publish-release 一键发版、/push-changes 一键推送\n\n### 🐛 问题修复\n- 修复设置-关于页 GitHubUrl 只读属性 TwoWay 绑定异常（偶发 UI 线程报错）\n- 崩溃日志不再写入桌面，统一保存到 %AppData%\\AiMux\\logs\n\n### 🧹 杂项\n- 项目初始化（v0.0.1 基础版本）\n\n共 2 条提交。",
+  "url": "https://github.com/Ledgerbiggg/AIMux/releases/latest"
+}
