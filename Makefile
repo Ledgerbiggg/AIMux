@@ -4,6 +4,7 @@
 #
 # 常用:
 #   make dev       - 开发：杀进程 + 构建(Debug) + 运行
+#   make watch     - 热部署：启动后监听源码变化，自动重建并重启（按 Q 退出）
 #   make bump      - 仅把版本号 +1（patch 位），不打包不提交
 #   make dist      - 本地打包安装包（需本地 Inno Setup）：仅 publish -> 打包 -> package/
 #                    【不升版本号】测试打包用；升版本请用 /publish-release 或 make release
@@ -73,6 +74,11 @@ run:
 dev: build run
 	@echo "[dev] 已启动 AiMux"
 
+# 热部署：启动后监听源码变化，自动重新构建并重启应用（按 Q 退出）
+.PHONY: watch
+watch:
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev_watch.ps1
+
 # 清理构建产物（含 obj 缓存，解决奇怪的编译问题）
 .PHONY: clean
 clean: kill
@@ -138,6 +144,7 @@ help:
 	@echo.
 	@echo "可用目标:"
 	@echo "  dev        - 一键启动：杀进程 + 构建 + 运行（最常用）"
+	@echo "  watch      - 热部署：启动后监听源码，修改自动重建重启（按 Q 退出）"
 	@echo "  build      - 构建解决方案（Debug）"
 	@echo "  release    - 构建 Release 版本"
 	@echo "  run        - 启动主程序（需先 build）"
@@ -156,3 +163,4 @@ help:
 	@echo "        'make dist' only builds a local installer WITHOUT bumping the version."
 	@echo "Tip: MSB3021 (access denied) -> 'make kill' then 'make build'"
 	@echo "Tip: no window after launch -> stale Mutex from prior instance; 'make kill' then retry"
+	@echo "Tip: hot reload -> 'make watch' (rebuild & restart on source change, Q to quit)"
