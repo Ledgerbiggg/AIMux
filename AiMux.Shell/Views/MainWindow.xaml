@@ -43,23 +43,28 @@
 
                     <!-- 品牌区：左侧折叠按钮(始终显示) + 图标；展开态额外显示名称 -->
                     <Grid Grid.Row="0" Height="56" Margin="8,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <!-- 折叠 / 展开侧边栏按钮：始终显示 -->
-                        <Button Grid.Column="0" Style="{StaticResource TopBarButtonStyle}"
-                                Command="{Binding ToggleSidebarCommand}"
+                        <!-- 折叠 / 展开侧边栏按钮：展开态靠左、折叠态居中（与平台图标对齐） -->
+                        <Button Command="{Binding ToggleSidebarCommand}"
                                 Width="32" Height="32" Padding="0" ToolTip="折叠 / 展开侧边栏">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource TopBarButtonStyle}">
+                                    <Setter Property="HorizontalAlignment" Value="Left" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                                            <Setter Property="HorizontalAlignment" Value="Center" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                             <TextBlock Text="☰" FontSize="15"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
-                        <!-- 版本号：替换原来的 AI Chat Hub 品牌文字，放在侧边栏顶部醒目位置 -->
-                        <TextBlock Grid.Column="1" Text="{Binding Version, StringFormat='v{0}'}"
+                        <!-- 版本号：替换原来的 AI Chat Hub 品牌文字；展开态水平居中，折叠态隐藏 -->
+                        <TextBlock Text="{Binding Version, StringFormat='v{0}'}"
                                    FontSize="14" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                   VerticalAlignment="Center" Margin="8,0,0,0"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center"
                                    Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InverseBoolToVisConverter}}" />
                     </Grid>
 

@@ -9,7 +9,7 @@
 
             <StackPanel Margin="0,18,0,0">
                 <TextBlock Style="{StaticResource FormLabelStyle}" Text="默认平台" />
-                <ComboBox Height="32" FontSize="13"
+                <ComboBox Height="36" FontSize="13"
                           ItemsSource="{Binding Platforms}"
                           DisplayMemberPath="Name" SelectedValuePath="Id"
                           SelectedValue="{Binding DefaultPlatformId}" />

@@ -32,15 +32,16 @@ $nv = "$maj.$min.$pat"
 $nc = $c -replace '<Version>.*?</Version>', "<Version>$nv</Version>"
 Set-Content -Path $prj -Value $nc -Encoding utf8
 
-# 同步 version.json 的 version 字段（若存在），避免两处不一致
+# 同步 version.json 的 version 字段（若存在），避免两处不一致。
+# 对象方式更新 + .NET 写入 UTF-8 无 BOM：PS5.1 的 Set-Content -Encoding utf8 会写 BOM，
+# 带 BOM 的 JSON 经 GitHub raw 分发后会被程序 JsonDocument.Parse 拒绝，更新检测失效。
 $vj = Join-Path $repo 'version.json'
 if (Test-Path $vj) {
-    $j = Get-Content -Path $vj -Raw -Encoding utf8
-    $j = [regex]::Replace($j, '("version"\s*:\s*")[^"]*(")', { param($m) $m.Groups[1].Value + $nv + $m.Groups[2].Value })
-    if ($Notes -ne "") {
-        $j = [regex]::Replace($j, '("notes"\s*:\s*")[^"]*(")', { param($m) $m.Groups[1].Value + $Notes + $m.Groups[2].Value })
-    }
-    Set-Content -Path $vj -Value $j -Encoding utf8
+    $obj = Get-Content $vj -Raw -Encoding UTF8 | ConvertFrom-Json
+    $obj.version = $nv
+    if ($Notes -ne '') { $obj.notes = $Notes }
+    $out = $obj | ConvertTo-Json -Depth 5
+    [System.IO.File]::WriteAllText($vj, $out, [System.Text.UTF8Encoding]::new($false))  # 无 BOM
 }
 
 Write-Host "[bump] $($m.Groups[1].Value) -> $nv"
