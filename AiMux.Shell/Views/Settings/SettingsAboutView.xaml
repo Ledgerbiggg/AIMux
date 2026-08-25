@@ -46,7 +46,7 @@
                 </ui:Button>
 
                 <ui:Button Appearance="Secondary" Command="{Binding CheckCommand}"
-                          IsEnabled="{Binding IsChecking, Converter={StaticResource InverseBoolConverter}}"
+                          IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"
                           Padding="20,8" FontSize="13" Margin="10,0,0,0">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="ArrowSync24" FontSize="15" VerticalAlignment="Center" Margin="0,0,7,0" />
@@ -58,7 +58,7 @@
             <!-- Update Status -->
             <TextBlock Margin="0,10,0,0" FontSize="12" HorizontalAlignment="Center"
                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                       Text="{Binding Status}" Visibility="{Binding IsChecking, Converter={StaticResource BoolToVisConverter}}" />
+                       Text="{Binding Status}" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisConverter}}" />
 
             <!-- Info Card -->
             <Border Margin="0,26,0,0" Padding="22,18" CornerRadius="10"

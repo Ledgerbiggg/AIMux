@@ -13,9 +13,12 @@ public class UpdateInfo
     public string Url { get; set; } = "";
 }
 
-/// <summary>版本更新检测服务：拉取远程 version.json 并提供版本比对</summary>
+/// <summary>版本更新检测服务：拉取远程 version.json 并提供安装包下载</summary>
 public interface IUpdateService
 {
     /// <summary>获取远程最新版本信息；网络异常时返回 null</summary>
     Task<UpdateInfo?> FetchLatestAsync();
+
+    /// <summary>下载指定版本安装包到临时目录，按 0-100 报告进度；失败返回 null（异常已记日志）</summary>
+    Task<string?> DownloadInstallerAsync(string version, IProgress<int>? progress = null, CancellationToken ct = default);
 }

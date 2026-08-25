@@ -1,5 +1,5 @@
-﻿{
-  "version": "0.0.2",
-  "notes": "## v0.0.2 更新说明\n> 生成时间：2026-08-24 23:01\n\n### ✨ 新功能\n- 全局未处理异常弹窗提示：不再静默吞错，异常详情自动写入日志目录\n- 新增 Qoder 项目技能：/publish-release 一键发版、/push-changes 一键推送\n\n### 🐛 问题修复\n- 修复设置-关于页 GitHubUrl 只读属性 TwoWay 绑定异常（偶发 UI 线程报错）\n- 崩溃日志不再写入桌面，统一保存到 %AppData%\\AiMux\\logs\n\n### 🧹 杂项\n- 项目初始化（v0.0.1 基础版本）\n\n共 2 条提交。",
+{
+  "version": "0.0.3",
+  "notes": "## v0.0.3 更新说明\n> 生成时间：2026-08-25 20:48\n\n### ✨ 新功能\n- 设置-关于页「检查更新」升级为自动更新：发现新版本后一键下载安装包并启动安装向导完成升级\n- 新增 make watch 热部署开发指令：监听源码变化自动重新构建并重启应用\n\n### 🔧 构建/流水线\n- Makefile 默认目标改为 watch（热部署）\n\n共 3 项变更。",
   "url": "https://github.com/Ledgerbiggg/AIMux/releases/latest"
 }
