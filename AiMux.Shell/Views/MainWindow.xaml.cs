@@ -107,6 +107,9 @@ public partial class MainWindow : FluentWindow
             // 首次加载默认平台：先让 WebView 初始化，界面先出来
             if (_vm.SelectedPlatform is not null)
                 await SwitchPlatformAsync(_vm.SelectedPlatform);
+
+            // 启动静默检查版本：有新版本时标题栏显示更新标识（失败/无更新静默）
+            _ = _vm.CheckUpdateAtStartupAsync();
         }
         catch (Exception ex)
         {

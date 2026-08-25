@@ -20,7 +20,20 @@
 
         <!-- 标题栏：WPF-UI 4.0 的 TitleBar.Icon 是 IconSource 类型，不接受 DrawingImage，暂不设置图标避免崩溃 -->
         <ui:TitleBar x:Name="TitleBar" Grid.Row="0" Title="{Binding Title}"
-                     CloseWindowByDoubleClickOnIcon="True" />
+                     CloseWindowByDoubleClickOnIcon="True">
+            <ui:TitleBar.Header>
+                <!-- 有新版本标识：启动静默检查发现新版后显示，点击进入确认→下载→安装流程 -->
+                <Button Command="{Binding UpdateCommand}"
+                        Style="{StaticResource TopBarButtonStyle}"
+                        Height="30" Padding="12,0" Margin="0,0,10,0"
+                        ToolTip="发现新版本，点击更新"
+                        Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisConverter}}">
+                    <TextBlock Text="{Binding UpdateBadgeText}" FontSize="12" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                               VerticalAlignment="Center" />
+                </Button>
+            </ui:TitleBar.Header>
+        </ui:TitleBar>
 
         <!-- 主体：侧边栏 + 内容区 -->
         <Grid Grid.Row="1">

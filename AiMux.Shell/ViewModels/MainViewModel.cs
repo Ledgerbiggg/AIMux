@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows;
 using AiMux.Common.Config;
 using AiMux.Common.Logger;
 using AiMux.Services.IService;
+using AiMux.Services.Service;
 using AiMux.Shell.Util;
 using AiMux.Shell.Views;
 using Prism.Commands;
@@ -17,6 +19,10 @@ public class MainViewModel : BindableBase
     private readonly IPlatformService _platformService;
     private readonly IIconService _iconService;
     private readonly ConfigService _config;
+
+    /// <summary>版本更新服务（与设置-关于页同一实现）</summary>
+    private readonly IUpdateService _update = new UpdateService();
+    private UpdateInfo? _latestInfo;
 
     /// <summary>侧边栏平台列表</summary>
     public ObservableCollection<PlatformItem> Platforms { get; } = [];
@@ -38,6 +44,33 @@ public class MainViewModel : BindableBase
     }
 
     public string Title => "AI Chat Hub";
+
+    /// <summary>标题栏是否显示「有新版本」标识（启动静默检查发现新版后置 true）</summary>
+    private bool _hasUpdate;
+    public bool HasUpdate
+    {
+        get => _hasUpdate;
+        private set => SetProperty(ref _hasUpdate, value);
+    }
+
+    /// <summary>更新标识文字：发现新版本显示版本号，下载中显示百分比</summary>
+    private string _updateBadgeText = "";
+    public string UpdateBadgeText
+    {
+        get => _updateBadgeText;
+        private set => SetProperty(ref _updateBadgeText, value);
+    }
+
+    /// <summary>是否正在下载更新（下载中标识不可重复点击）</summary>
+    private bool _isUpdating;
+    public bool IsUpdating
+    {
+        get => _isUpdating;
+        private set => SetProperty(ref _isUpdating, value);
+    }
+
+    /// <summary>点击标题栏更新标识：确认 → 下载（标识显示进度）→ 启动安装并退出</summary>
+    public DelegateCommand UpdateCommand { get; }
 
     /// <summary>主界面左上角展示的版本号：原样三段显示，如 0.5.1。</summary>
     public string Version => GetVersionString();
@@ -118,6 +151,7 @@ public class MainViewModel : BindableBase
         ToggleSidebarCommand = new DelegateCommand(ToggleSidebar);
         OpenSettingsCommand = new DelegateCommand(OpenSettings);
         ReloadCommand = new DelegateCommand(() => ReloadRequested?.Invoke(this, EventArgs.Empty));
+        UpdateCommand = new DelegateCommand(async () => await UpdateAsync());
 
         _platformService.PlatformsChanged += (_, _) => RefreshPlatforms();
         LoadPlatforms();
@@ -227,4 +261,76 @@ public class MainViewModel : BindableBase
             _ = MessageBoxHelper.Error("打开设置失败：" + ex.Message);
         }
     }
+
+    /// <summary>启动时静默检查版本：有新版本则在标题栏显示更新标识；失败/无更新静默不打扰</summary>
+    public async Task CheckUpdateAtStartupAsync()
+    {
+        try
+        {
+            var info = await _update.FetchLatestAsync();
+            if (info is null || !UpdateService.IsNewer(info.Version, Version)) return;
+            _latestInfo = info;
+            HasUpdate = true;
+            UpdateBadgeText = $"🆕 新版本 v{info.Version}";
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Info($"启动检查更新失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>标题栏更新标识点击：确认更新内容 → 下载（标识显示进度）→ 启动安装向导并退出主程序</summary>
+    private async Task UpdateAsync()
+    {
+        if (IsUpdating || _latestInfo is null) return;
+        var info = _latestInfo;
+
+        var msg = $"发现新版本 v{info.Version}（当前 v{Version}）";
+        if (!string.IsNullOrWhiteSpace(info.Notes))
+            msg += $"\n\n更新内容：\n{TruncateNotes(info.Notes)}";
+        msg += "\n\n是否立即下载并安装？";
+        if (!await MessageBoxHelper.Confirm(msg, "发现新版本"))
+            return;
+
+        IsUpdating = true;
+        UpdateBadgeText = "正在下载更新… 0%";
+        try
+        {
+            var progress = new Progress<int>(p => UpdateBadgeText = $"正在下载更新… {p}%");
+            var installer = await _update.DownloadInstallerAsync(info.Version, progress);
+            if (installer == null)
+            {
+                UpdateBadgeText = "下载失败";
+                _ = MessageBoxHelper.Error("安装包下载失败，请稍后在「设置-关于」中重试，或前往 GitHub 手动下载。");
+                return;
+            }
+
+            UpdateBadgeText = "更新就绪";
+            if (!await MessageBoxHelper.Confirm(
+                    $"安装包已下载完成（v{info.Version}）。\n\n点击「确认」将启动安装向导，请按提示完成安装；安装完成后即可使用新版本。",
+                    "更新就绪"))
+            {
+                HasUpdate = false;
+                return;
+            }
+
+            // 启动安装向导（UAC 提权由系统接管），随后退出主程序避免 exe 文件被占用
+            Process.Start(new ProcessStartInfo(installer) { UseShellExecute = true });
+            await Task.Delay(1000);
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Error("标题栏更新流程异常", ex);
+            UpdateBadgeText = "更新失败";
+        }
+        finally
+        {
+            IsUpdating = false;
+        }
+    }
+
+    /// <summary>截断过长的更新说明，避免弹窗超长</summary>
+    private static string TruncateNotes(string s)
+        => string.IsNullOrEmpty(s) ? "" : (s.Length <= 600 ? s : s[..600] + "…");
 }
