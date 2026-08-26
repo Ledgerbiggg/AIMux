@@ -489,6 +489,8 @@ public partial class MainWindow : FluentWindow
     /// <summary>关闭按钮 → 隐藏到托盘常驻（真正退出走托盘"退出"）</summary>
     private void MainWindow_OnClosing(object? sender, CancelEventArgs e)
     {
+        // 调试：记录主窗口收到关闭请求时的调用来源
+        AiMux.Common.Logger.LoggerHelper.Info($"MainWindow_OnClosing 触发, _closingToTray={_closingToTray}\n{Environment.StackTrace}");
         if (_closingToTray)
         {
             e.Cancel = true;

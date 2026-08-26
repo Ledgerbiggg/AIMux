@@ -22,5 +22,7 @@ public partial class SettingsWindow : FluentWindow
         }
         DataContext = viewModel;
         Closed += (_, _) => viewModel.PlatformVm.Cleanup();
+        // 调试：记录设置窗口关闭请求的调用来源
+        Closing += (_, _) => AiMux.Common.Logger.LoggerHelper.Info($"SettingsWindow_OnClosing 触发\n{Environment.StackTrace}");
     }
 }
