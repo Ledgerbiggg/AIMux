@@ -151,6 +151,7 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <ui:TextBox x:Name="AddressBar" Grid.Column="0" VerticalAlignment="Center" Height="30"
                                         Margin="0,0,6,0" Padding="10,0"
@@ -163,6 +164,13 @@
                                     ToolTip="复制当前链接">
                                 <TextBlock x:Name="CopyUrlIcon" Text="📋" FontSize="14"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                            <!-- 回到当前平台主页（平台配置 URL）；已在主页时自动禁用，避免误触 -->
+                            <Button Grid.Column="2" Style="{StaticResource TopBarButtonStyle}" Command="{Binding HomeCommand}"
+                                    Width="34" Height="30" Padding="0" Margin="4,0,0,0"
+                                    ToolTip="回到当前平台主页">
+                                <TextBlock Text="🏠" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
                         </Grid>
@@ -185,13 +193,6 @@
                                     ToolTip="放大 / 缩小窗口（并收起 / 展开侧边栏）">
                                 <TextBlock x:Name="CompactToggleIcon" Text="↗" FontSize="14"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Button>
-                            <!-- 回到当前平台主页（平台配置 URL）；已在主页时自动禁用，避免误触 -->
-                            <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding HomeCommand}"
-                                    Width="34" Height="34" Padding="0" Margin="4,0,0,0"
-                                    ToolTip="回到当前平台主页">
-                                <TextBlock Text="🏠" FontSize="15" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
                             <!-- 刷新当前网页 -->
