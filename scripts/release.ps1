@@ -31,7 +31,7 @@ git add -A
 git commit -m "release: bump to $newVer" -m $Notes
 if ($LASTEXITCODE -ne 0) { Write-Error "[release] git commit failed"; exit $LASTEXITCODE }
 
-git push origin master
+git push origin main
 if ($LASTEXITCODE -ne 0) { Write-Error "[release] git push failed"; exit $LASTEXITCODE }
 
 Write-Host "[release] Pushed $newVer. GitHub Actions will build & publish the installer."
