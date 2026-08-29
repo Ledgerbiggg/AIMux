@@ -142,6 +142,20 @@ public class MainViewModel : BindableBase
     /// <summary>请求刷新当前平台网页</summary>
     public event EventHandler? ReloadRequested;
 
+    /// <summary>回到当前平台配置主页命令（主窗口监听事件执行）</summary>
+    public DelegateCommand HomeCommand { get; }
+
+    /// <summary>请求回到当前平台主页（平台配置 URL）</summary>
+    public event EventHandler? HomeRequested;
+
+    /// <summary>当前 WebView 实际网址（地址栏同步来源；用于判断"是否已在主页"以禁用主页按钮）</summary>
+    private string _currentActualUrl = "";
+    public string CurrentActualUrl
+    {
+        get => _currentActualUrl;
+        set => SetProperty(ref _currentActualUrl, value);
+    }
+
     public MainViewModel(IPlatformService platformService, IIconService iconService, ConfigService config)
     {
         _platformService = platformService;
@@ -151,6 +165,14 @@ public class MainViewModel : BindableBase
         ToggleSidebarCommand = new DelegateCommand(ToggleSidebar);
         OpenSettingsCommand = new DelegateCommand(OpenSettings);
         ReloadCommand = new DelegateCommand(() => ReloadRequested?.Invoke(this, EventArgs.Empty));
+        // 主页按钮仅在"已加载且当前不在主页"时可点；已在主页时自动禁用，避免误触/无效操作
+        // 注意：表达式树 lambda 不支持 ?. 空传播，故用三元规避
+        HomeCommand = new DelegateCommand(() => HomeRequested?.Invoke(this, EventArgs.Empty))
+            .ObservesCanExecute(() =>
+                !string.IsNullOrEmpty(CurrentActualUrl) &&
+                !string.Equals(CurrentActualUrl,
+                    SelectedPlatform == null ? null : SelectedPlatform.Info.Url,
+                    StringComparison.OrdinalIgnoreCase));
         UpdateCommand = new DelegateCommand(async () => await UpdateAsync());
 
         _platformService.PlatformsChanged += (_, _) => RefreshPlatforms();

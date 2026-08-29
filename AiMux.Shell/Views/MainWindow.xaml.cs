@@ -82,6 +82,7 @@ public partial class MainWindow : FluentWindow
         _copyTimer.Tick += (_, _) => ResetCopyButton();
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.ReloadRequested += (_, _) => ReloadCurrent();
+        _vm.HomeRequested += (_, _) => GoHome();
         _trayService.ShowRequested += (_, _) => ToggleWindow();   // 右键菜单：显示/隐藏（切换）
         _trayService.OpenRequested += (_, _) => ShowWindow();    // 左键单击托盘：仅打开，不隐藏（不与快捷键串）
         _trayService.ExitRequested += (_, _) => ExitApp();
@@ -301,6 +302,7 @@ public partial class MainWindow : FluentWindow
             // 不会再触发 NavigationCompleted，必须在这里更新，否则会显示上一个平台的旧链接
             if (AddressBar != null)
                 AddressBar.Text = host.CurrentUrl;
+            _vm.CurrentActualUrl = host.CurrentUrl;
         }
         finally
         {
@@ -376,6 +378,16 @@ public partial class MainWindow : FluentWindow
             _hosts.TryGetValue(_vm.SelectedPlatform.Id, out var host))
         {
             host.Reload();
+        }
+    }
+
+    /// <summary>回到当前平台配置的主页（Platform.Url）：仅在当前平台自身实例内导航，不影响其它平台常驻状态</summary>
+    private void GoHome()
+    {
+        if (_vm.SelectedPlatform is not null &&
+            _hosts.TryGetValue(_vm.SelectedPlatform.Id, out var host))
+        {
+            host.Navigate(_vm.SelectedPlatform.Info.Url);
         }
     }
 
@@ -517,6 +529,8 @@ public partial class MainWindow : FluentWindow
     {
         if (AddressBar != null && !AddressBar.IsKeyboardFocused && url != AddressBar.Text)
             AddressBar.Text = url;
+        // 同步实际网址，驱动主页按钮"已在主页则禁用"的可用状态
+        _vm.CurrentActualUrl = url;
     }
 
     /// <summary>复制当前链接到剪贴板；成功后图标变打勾并高亮，约 2 秒后恢复</summary>
