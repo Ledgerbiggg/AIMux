@@ -32,7 +32,11 @@ public class MainViewModel : BindableBase
     public PlatformItem? SelectedPlatform
     {
         get => _selectedPlatform;
-        set => SetProperty(ref _selectedPlatform, value);
+        set
+        {
+            if (SetProperty(ref _selectedPlatform, value))
+                RaisePropertyChanged(nameof(CanGoHome));
+        }
     }
 
     /// <summary>侧边栏是否折叠为纯图标态（折叠=60 宽只显示图标，展开=224 宽显示图标+平台名）</summary>
@@ -153,8 +157,19 @@ public class MainViewModel : BindableBase
     public string CurrentActualUrl
     {
         get => _currentActualUrl;
-        set => SetProperty(ref _currentActualUrl, value);
+        set
+        {
+            if (SetProperty(ref _currentActualUrl, value))
+                RaisePropertyChanged(nameof(CanGoHome));
+        }
     }
+
+    /// <summary>是否可回主页：当前不在主页且已加载出网址时才允许（已在主页则按钮禁用，避免误触/无效操作）</summary>
+    public bool CanGoHome =>
+        !string.IsNullOrEmpty(CurrentActualUrl) &&
+        !string.Equals(CurrentActualUrl,
+            SelectedPlatform == null ? null : SelectedPlatform.Info.Url,
+            StringComparison.OrdinalIgnoreCase);
 
     public MainViewModel(IPlatformService platformService, IIconService iconService, ConfigService config)
     {
@@ -166,13 +181,9 @@ public class MainViewModel : BindableBase
         OpenSettingsCommand = new DelegateCommand(OpenSettings);
         ReloadCommand = new DelegateCommand(() => ReloadRequested?.Invoke(this, EventArgs.Empty));
         // 主页按钮仅在"已加载且当前不在主页"时可点；已在主页时自动禁用，避免误触/无效操作
-        // 注意：表达式树 lambda 不支持 ?. 空传播，故用三元规避
+        // 必须观察 CanGoHome 属性本身（MemberExpression），Prism PropertyObserver 不支持复杂表达式树
         HomeCommand = new DelegateCommand(() => HomeRequested?.Invoke(this, EventArgs.Empty))
-            .ObservesCanExecute(() =>
-                !string.IsNullOrEmpty(CurrentActualUrl) &&
-                !string.Equals(CurrentActualUrl,
-                    SelectedPlatform == null ? null : SelectedPlatform.Info.Url,
-                    StringComparison.OrdinalIgnoreCase));
+            .ObservesCanExecute(() => CanGoHome);
         UpdateCommand = new DelegateCommand(async () => await UpdateAsync());
 
         _platformService.PlatformsChanged += (_, _) => RefreshPlatforms();
