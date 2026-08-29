@@ -20,6 +20,12 @@ public partial class WebViewHost : UserControl
     /// <summary>当前承载的平台配置</summary>
     public PlatformInfo Platform { get; }
 
+    /// <summary>当前实际网址（导航完成后）变化通知，供主窗口地址栏同步</summary>
+    public event Action<string>? AddressChanged;
+
+    /// <summary>当前 WebView 实际网址（供地址栏显示 / 复制使用；未初始化时回退到平台配置地址）</summary>
+    public string CurrentUrl => WebView.CoreWebView2?.Source?.ToString() ?? Platform.Url;
+
     public WebViewHost(PlatformInfo platform, IWebViewService webViewService,
         IIconService iconService, IPlatformService platformService)
     {
@@ -46,11 +52,46 @@ public partial class WebViewHost : UserControl
         {
             var env = await _webViewService.GetEnvironmentAsync();
             await WebView.EnsureCoreWebView2Async(env);
+            // 拦截新窗口请求：不让其弹出外部浏览器 / 独立窗口，统一改为「在当前 WebView 内打开，
+            // 旧内容被替换」的通用行为（点开视频 / 链接都留在界面内，不脱离桌面）
+            WebView.CoreWebView2.NewWindowRequested += CoreWebView2_OnNewWindowRequested;
             WebView.Source = new Uri(Platform.Url);
         }
         catch (Exception ex)
         {
             LoggerHelper.Error($"WebView2 初始化失败: {Platform.Url}", ex);
+        }
+    }
+
+    /// <summary>页面内 window.open / 新窗口请求：改为在当前 WebView 内导航，旧页面被替换（通用行为）</summary>
+    private void CoreWebView2_OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
+    {
+        try
+        {
+            e.Handled = true; // 标记已处理，阻止 WebView2 把新窗口丢给系统默认浏览器
+            if (!string.IsNullOrEmpty(e.Uri))
+                WebView.CoreWebView2?.Navigate(e.Uri);
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Info($"新窗口内打开失败: {e.Uri} - {ex.Message}");
+        }
+    }
+
+    /// <summary>外部（地址栏）调用：在当前 WebView 内跳转到指定网址，新内容替换旧内容（通用）</summary>
+    public void Navigate(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return;
+        try
+        {
+            if (WebView.CoreWebView2 != null)
+                WebView.CoreWebView2.Navigate(url);
+            else
+                WebView.Source = new Uri(url);
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Error($"导航失败: {url}", ex);
         }
     }
 
@@ -60,6 +101,10 @@ public partial class WebViewHost : UserControl
     {
         if (e.IsSuccess)
             Placeholder.Visibility = Visibility.Collapsed;
+
+        // 通知外部（地址栏）当前实际网址，便于同步显示
+        try { AddressChanged?.Invoke(WebView.Source?.ToString() ?? ""); }
+        catch { }
 
         // 已有本地图标缓存则不再重复抓取，避免每次导航都写文件
         if (!string.IsNullOrEmpty(Platform.Icon) && File.Exists(Platform.Icon))

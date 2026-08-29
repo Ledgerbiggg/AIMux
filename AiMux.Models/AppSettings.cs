@@ -89,6 +89,9 @@ public class WindowSettings
 
     /// <summary>上次是否为小窗模式（默认小窗）</summary>
     public bool IsCompact { get; set; } = true;
+
+    /// <summary>侧边栏是否折叠（独立记忆，不随窗口大小变化；默认折叠）</summary>
+    public bool SidebarCollapsed { get; set; } = true;
 }
 
 /// <summary>运行行为设置</summary>

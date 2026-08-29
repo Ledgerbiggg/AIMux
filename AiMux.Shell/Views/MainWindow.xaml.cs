@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -41,6 +42,10 @@ public partial class MainWindow : FluentWindow
     private HwndSource? _hwndSource;
     private bool _closingToTray = true;
     private bool _isCompactMode;
+    /// <summary>置顶（盯住窗口）状态：仅当前会话内有效，不持久化</summary>
+    private bool _isPinned;
+    /// <summary>复制按钮反馈计时器：复制成功后显示打勾，约 2 秒后恢复图标</summary>
+    private readonly DispatcherTimer _copyTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     /// <summary>正在切换平台标志：防止 RefreshPlatforms 重建时 SelectedPlatform 变化递归触发死循环</summary>
     private bool _isSwitching;
 
@@ -74,6 +79,7 @@ public partial class MainWindow : FluentWindow
         _settings = _config.LoadSettings();
         DataContext = vm;
 
+        _copyTimer.Tick += (_, _) => ResetCopyButton();
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.ReloadRequested += (_, _) => ReloadCurrent();
         _trayService.ShowRequested += (_, _) => ToggleWindow();   // 右键菜单：显示/隐藏（切换）
@@ -283,12 +289,18 @@ public partial class MainWindow : FluentWindow
             if (!_hosts.TryGetValue(item.Id, out var host))
             {
                 host = new WebViewHost(item.Info, _webViewService, _iconService, _platformService);
+                host.AddressChanged += OnHostAddressChanged;
                 _hosts[item.Id] = host;
                 WebViewContainer.Children.Add(host);
             }
 
             host.Visibility = Visibility.Visible;
             await host.EnsureInitializedAsync();
+
+            // 切换平台后主动同步地址栏为当前实例的实际网址：已初始化实例不会重新导航，
+            // 不会再触发 NavigationCompleted，必须在这里更新，否则会显示上一个平台的旧链接
+            if (AddressBar != null)
+                AddressBar.Text = host.CurrentUrl;
         }
         finally
         {
@@ -342,6 +354,7 @@ public partial class MainWindow : FluentWindow
         // Topmost 闪烁：确保窗口跳到所有窗口最前面（解决被其他窗口遮挡"闪一下消失"的问题）
         Topmost = true;
         Topmost = false;
+        Topmost = _isPinned; // 恢复用户置顶状态，不被临时闪烁覆盖
 
         // 短暂等待页面响应后注入聚焦脚本（失败不阻塞，可手动点击）
         try
@@ -463,15 +476,81 @@ public partial class MainWindow : FluentWindow
         _isCompactMode = !_isCompactMode;
         Width = _isCompactMode ? win.CompactWidth : win.FullWidth;
         Height = _isCompactMode ? win.CompactHeight : win.FullHeight;
-        // 切换尺寸后居中到屏幕（位置复原），避免窗口被拖到角落
-        var area = SystemParameters.WorkArea;
-        Left = (area.Width - Width) / 2 + area.Left;
-        Top = (area.Height - Height) / 2 + area.Top;
-        // 联动侧边栏：缩小收起、放大展开（动画由 OnVmPropertyChanged 触发）
-        _vm.IsSidebarCollapsed = _isCompactMode;
+        // 切换尺寸后在「当前所在屏幕」内居中：用窗口句柄取所在显示器的 WorkArea，
+        // 避免多屏时跳到主屏（如竖屏看视频却被甩到横屏）；并做边界约束防止超出屏幕
+        var area = GetCurrentMonitorWorkArea();
+        Left = Math.Max(area.Left, Math.Min(area.Left + (area.Width - Width) / 2, area.Right - Width));
+        Top = Math.Max(area.Top, Math.Min(area.Top + (area.Height - Height) / 2, area.Bottom - Height));
         // 图标随模式切换：小窗显示放大(↗)，大窗显示缩小(↙)，明确表达按钮语义
         if (CompactToggleIcon != null)
             CompactToggleIcon.Text = _isCompactMode ? "↗" : "↙";
+    }
+
+    /// <summary>置顶（盯住窗口）按钮：仅当前会话内切换，不持久化到配置</summary>
+    private void PinToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _isPinned = !_isPinned;
+        Topmost = _isPinned;
+        if (PinToggleIcon != null)
+            PinToggleIcon.Foreground = _isPinned
+                ? (System.Windows.Media.Brush)FindResource("AccentTextFillColorPrimaryBrush")
+                : (System.Windows.Media.Brush)FindResource("TextFillColorSecondaryBrush");
+    }
+
+    /// <summary>地址栏回车：补全协议后在当前 WebView 打开（新内容替换旧内容，通用）</summary>
+    private void AddressBar_OnKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        var url = AddressBar?.Text?.Trim();
+        if (string.IsNullOrEmpty(url)) return;
+        if (!url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            url = "https://" + url;
+        if (_vm.SelectedPlatform is not null &&
+            _hosts.TryGetValue(_vm.SelectedPlatform.Id, out var host))
+        {
+            host.Navigate(url);
+        }
+    }
+
+    /// <summary>WebView 实际网址变化：仅当地址栏未聚焦时同步，避免打断用户输入</summary>
+    private void OnHostAddressChanged(string url)
+    {
+        if (AddressBar != null && !AddressBar.IsKeyboardFocused && url != AddressBar.Text)
+            AddressBar.Text = url;
+    }
+
+    /// <summary>复制当前链接到剪贴板；成功后图标变打勾并高亮，约 2 秒后恢复</summary>
+    private void CopyUrl_Click(object sender, RoutedEventArgs e)
+    {
+        var url = AddressBar?.Text?.Trim();
+        if (string.IsNullOrEmpty(url)) return;
+        try
+        {
+            Clipboard.SetText(url);
+            // 视觉反馈：变成打勾状态，2 秒后恢复，明确告知用户复制成功
+            if (CopyUrlIcon != null)
+            {
+                CopyUrlIcon.Text = "✓";
+                CopyUrlIcon.Foreground = (System.Windows.Media.Brush)FindResource("AccentTextFillColorPrimaryBrush");
+            }
+            _copyTimer.Stop();
+            _copyTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Info($"复制链接失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>复制反馈结束：图标与颜色恢复初始状态</summary>
+    private void ResetCopyButton()
+    {
+        _copyTimer.Stop();
+        if (CopyUrlIcon != null)
+        {
+            CopyUrlIcon.Text = "📋";
+            CopyUrlIcon.Foreground = (System.Windows.Media.Brush)FindResource("TextFillColorSecondaryBrush");
+        }
     }
 
     /// <summary>右上角主题切换：在浅色 / 深色间切换，立即应用并保存（配置中的主题同步更新）</summary>
@@ -517,8 +596,8 @@ public partial class MainWindow : FluentWindow
         _isCompactMode = win.IsCompact;
         Width = _isCompactMode ? win.CompactWidth : win.FullWidth;
         Height = _isCompactMode ? win.CompactHeight : win.FullHeight;
-        // 小窗模式初始即折叠侧边栏（动画由 OnVmPropertyChanged 触发）
-        _vm.IsSidebarCollapsed = _isCompactMode;
+        // 侧边栏折叠状态独立记忆（不随窗口大小变化），默认折叠
+        _vm.IsSidebarCollapsed = win.SidebarCollapsed;
     }
 
     /// <summary>记录窗口位置与大小模式到 settings.json</summary>
@@ -531,6 +610,7 @@ public partial class MainWindow : FluentWindow
             win.Top = Top;
         }
         win.IsCompact = _isCompactMode;
+        win.SidebarCollapsed = _vm.IsSidebarCollapsed;
         _config.SaveSettings(_settings);
     }
 
@@ -542,6 +622,55 @@ public partial class MainWindow : FluentWindow
         _trayService.Hide();
         Application.Current.Shutdown();
     }
+
+    #region 多屏定位辅助
+
+    /// <summary>取窗口当前所在显示器的 WorkArea（任务栏之外的可用区域），多屏时不会跳到主屏</summary>
+    private Rect GetCurrentMonitorWorkArea()
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            var mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (mon != IntPtr.Zero)
+            {
+                var info = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
+                if (GetMonitorInfo(mon, ref info))
+                {
+                    var wa = info.rcWork;
+                    return new Rect(wa.left, wa.top, wa.right - wa.left, wa.bottom - wa.top);
+                }
+            }
+        }
+        catch { /* 回退到主屏 WorkArea */ }
+        var area = SystemParameters.WorkArea;
+        return new Rect(area.X, area.Y, area.Width, area.Height);
+    }
+
+    private const uint MONITOR_DEFAULTTONEAREST = 2;
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int left, top, right, bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MONITORINFO
+    {
+        public uint cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    #endregion
 
     #region 侧边栏平台列表拖拽排序
 
