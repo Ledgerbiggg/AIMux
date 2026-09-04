@@ -89,16 +89,39 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <!-- 图标：无背景色，透明，固定 28 外框 / 24 图像，避免被压缩遮挡 -->
+                                        <!-- 图标：无背景色，透明，固定 28 外框 / 24 图像，避免被压缩遮挡。
+                                             图标与首字母互斥显示：优先图标；IconSource 为 null（未配置/加载失败）才显示首字母，
+                                             避免透明图标与文字叠在一起 -->
                                         <Border Grid.Column="0" Width="28" Height="28" CornerRadius="7" Background="Transparent">
                                             <Grid>
                                                 <TextBlock Text="{Binding Initial}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontSize="12"
-                                                           FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                           FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IconSource}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                                 <Image Source="{Binding IconSource}" Width="24" Height="24" Stretch="Uniform"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center">
                                                     <Image.Clip>
                                                         <RectangleGeometry Rect="0,0,24,24" RadiusX="5" RadiusY="5" />
                                                     </Image.Clip>
+                                                    <Image.Style>
+                                                        <Style TargetType="Image">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IconSource}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Image.Style>
                                                 </Image>
                                             </Grid>
                                         </Border>

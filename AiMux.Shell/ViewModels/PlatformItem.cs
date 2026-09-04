@@ -27,8 +27,14 @@ public class PlatformItem : BindableBase
     /// <summary>图标兜底底色画刷：默认透明（需求：底色默认不给，未配置即为透明）</summary>
     public Brush AccentBrush { get; }
 
-    /// <summary>图标源（本地文件或图片链接），无则为 null</summary>
-    public ImageSource? IconSource { get; }
+    private ImageSource? _iconSource;
+
+    /// <summary>图标源（本地文件或图片链接）；未配置或加载失败为 null，界面回退显示首字母</summary>
+    public ImageSource? IconSource
+    {
+        get => _iconSource;
+        private set => SetProperty(ref _iconSource, value);
+    }
 
     public PlatformItem(PlatformInfo info, string iconPath, string accentColor)
     {
@@ -42,16 +48,33 @@ public class PlatformItem : BindableBase
                 if (iconPath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                     iconPath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                 {
-                    IconSource = new BitmapImage(new Uri(iconPath, UriKind.Absolute));
+                    // 网络图标异步下载：失败（网络错误/解码失败）时置回 null，界面自动回退首字母
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.UriSource = new Uri(iconPath, UriKind.Absolute);
+                    bmp.DecodePixelWidth = 48; // 24px 显示尺寸的 2x，避免高分屏模糊
+                    bmp.CacheOption = BitmapCacheOption.OnDemand;
+                    bmp.EndInit();
+                    bmp.DownloadFailed += (_, _) => IconSource = null;
+                    bmp.DecodeFailed += (_, _) => IconSource = null;
+                    IconSource = bmp;
                 }
                 else if (File.Exists(iconPath))
                 {
-                    IconSource = new BitmapImage(new Uri(iconPath, UriKind.Absolute));
+                    // 本地图标同步解码（OnLoad）：文件损坏直接抛异常走 catch 回退首字母
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.UriSource = new Uri(iconPath, UriKind.Absolute);
+                    bmp.DecodePixelWidth = 48;
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.EndInit();
+                    IconSource = bmp;
                 }
             }
             catch
             {
                 // 图标无效时忽略，走首字母兜底
+                IconSource = null;
             }
         }
     }
