@@ -126,6 +126,7 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<IIconService, IconService>();
         containerRegistry.RegisterSingleton<IWebViewService, WebViewService>();
         containerRegistry.RegisterSingleton<ITrayService, TrayService>();
+        containerRegistry.RegisterSingleton<IWebDavService, WebDavService>();
         containerRegistry.RegisterSingleton<HotkeyManager>();
 
         // 窗口与 ViewModel

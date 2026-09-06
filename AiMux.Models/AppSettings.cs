@@ -24,8 +24,30 @@ public class AppSettings
     /// <summary>外观主题：Light / Dark</summary>
     public string Theme { get; set; } = "Light";
 
+    /// <summary>WebDAV 配置同步设置</summary>
+    public WebDavSettings WebDav { get; set; } = new();
+
     /// <summary>构造函数：不填充任何默认热键，全部由用户自行设置</summary>
     public AppSettings() { }
+}
+
+/// <summary>WebDAV 配置同步设置：通过 WebDAV 服务器统一管理多设备配置</summary>
+public class WebDavSettings
+{
+    /// <summary>WebDAV 完整路径，直接填到配置文件存放的目录，如 https://dav.example.com/AiMux</summary>
+    public string ServerUrl { get; set; } = "";
+
+    /// <summary>用户名（Basic 认证）</summary>
+    public string Username { get; set; } = "";
+
+    /// <summary>密码（Basic 认证）</summary>
+    public string Password { get; set; } = "";
+
+    /// <summary>是否在保存设置时自动上传到 WebDAV</summary>
+    public bool AutoSync { get; set; } = false;
+
+    /// <summary>上次同步时间（UTC ISO 8601），从未同步为空</summary>
+    public string LastSyncTime { get; set; } = "";
 }
 
 /// <summary>单条热键绑定</summary>

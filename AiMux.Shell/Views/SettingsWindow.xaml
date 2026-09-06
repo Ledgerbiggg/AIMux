@@ -55,6 +55,9 @@
                         <DataTemplate DataType="{x:Type vm:SettingsAppearanceViewModel}">
                             <views:SettingsAppearanceView />
                         </DataTemplate>
+                        <DataTemplate DataType="{x:Type vm:SettingsSyncViewModel}">
+                            <views:SettingsSyncView />
+                        </DataTemplate>
                         <DataTemplate DataType="{x:Type vm:SettingsAboutViewModel}">
                             <views:SettingsAboutView />
                         </DataTemplate>

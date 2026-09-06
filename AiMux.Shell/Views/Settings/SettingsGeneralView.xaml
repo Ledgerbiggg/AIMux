@@ -83,23 +83,6 @@
                         Background="{DynamicResource ControlFillColorSecondaryBrush}"
                         BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel>
-                        <TextBlock Text="配置备份与迁移" FontWeight="SemiBold" FontSize="13"
-                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,4" />
-                        <TextBlock Text="将当前设置（窗口尺寸、热键、主题、默认平台）与全部网站列表导出为一个文件；导入后可快速恢复或迁移到其它电脑。"
-                                   FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
-                        <StackPanel Orientation="Horizontal">
-                            <Button Style="{StaticResource MiniPrimaryButtonStyle}" Command="{Binding ExportCommand}"
-                                    Content="导出配置" Padding="16,6" Margin="0,0,10,0" />
-                            <Button Style="{StaticResource MiniButtonStyle}" Command="{Binding ImportCommand}"
-                                    Content="导入配置" Padding="16,6" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <Border Margin="0,16,0,0" Padding="14,12" CornerRadius="8"
-                        Background="{DynamicResource ControlFillColorSecondaryBrush}"
-                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1">
-                    <StackPanel>
                         <TextBlock Text="恢复默认配置" FontWeight="SemiBold" FontSize="13"
                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,4" />
                         <TextBlock Text="将清空所有平台、窗口尺寸、热键与外观设置，恢复到首次安装时的初始状态（不影响已登录的网页账号）。"

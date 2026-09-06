@@ -10,7 +10,7 @@ namespace AiMux.Shell.ViewModels;
 public class SettingsViewModel : BindableBase
 {
     /// <summary>左侧导航项</summary>
-    public List<string> NavItems { get; } = ["平台管理", "通用设置", "热键设置", "外观", "关于"];
+    public List<string> NavItems { get; } = ["平台管理", "通用设置", "热键设置", "外观", "配置同步", "关于"];
 
     /// <summary>平台管理面板 VM</summary>
     public SettingsPlatformViewModel PlatformVm { get; }
@@ -23,6 +23,9 @@ public class SettingsViewModel : BindableBase
 
     /// <summary>外观面板 VM</summary>
     public SettingsAppearanceViewModel AppearanceVm { get; }
+
+    /// <summary>配置同步面板 VM</summary>
+    public SettingsSyncViewModel SyncVm { get; }
 
     /// <summary>关于面板 VM</summary>
     public SettingsAboutViewModel AboutVm { get; }
@@ -46,12 +49,13 @@ public class SettingsViewModel : BindableBase
     }
 
     public SettingsViewModel(IPlatformService platformService, IIconService iconService,
-        ConfigService config, HotkeyManager hotkeyManager)
+        ConfigService config, HotkeyManager hotkeyManager, IWebDavService webDavService)
     {
         PlatformVm = new SettingsPlatformViewModel(platformService, iconService);
         GeneralVm = new SettingsGeneralViewModel(config, platformService);
         HotkeyVm = new SettingsHotkeyViewModel(config, hotkeyManager);
         AppearanceVm = new SettingsAppearanceViewModel(config);
+        SyncVm = new SettingsSyncViewModel(config, webDavService);
         AboutVm = new SettingsAboutViewModel();
 
         _selectedNav = NavItems[0];
@@ -65,6 +69,7 @@ public class SettingsViewModel : BindableBase
             "通用设置" => GeneralVm,
             "热键设置" => HotkeyVm,
             "外观" => AppearanceVm,
+            "配置同步" => SyncVm,
             "关于" => AboutVm,
             _ => PlatformVm,
         };

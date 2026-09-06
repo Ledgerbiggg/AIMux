@@ -3,7 +3,7 @@ using Wpf.Ui.Controls;
 
 namespace AiMux.Shell.Views;
 
-/// <summary>设置窗口：左侧导航 + 四个设置面板（平台管理/通用/热键/外观）</summary>
+/// <summary>设置窗口：左侧导航 + 六个设置面板（平台管理/通用/热键/外观/配置同步/关于）</summary>
 public partial class SettingsWindow : FluentWindow
 {
     public SettingsWindow(SettingsViewModel viewModel)

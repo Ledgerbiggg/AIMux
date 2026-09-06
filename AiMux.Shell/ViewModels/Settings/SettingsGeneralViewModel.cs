@@ -37,6 +37,7 @@ public class SettingsGeneralViewModel : BindableBase
         set => SetProperty(ref _startHidden, value);
     }
 
+
     /// <summary>是否开机自动启动（写入注册表 Run 项）</summary>
     private bool _autoStart;
     public bool AutoStart
@@ -111,8 +112,6 @@ public class SettingsGeneralViewModel : BindableBase
         FullWidth = _settings.Window.FullWidth;
         FullHeight = _settings.Window.FullHeight;
         SaveCommand = new DelegateCommand(Save);
-        ExportCommand = new DelegateCommand(ExportConfig);
-        ImportCommand = new DelegateCommand(ImportConfig);
         ResetCommand = new DelegateCommand(ResetToDefault);
         Version = MainViewModel.GetVersionString();
     }
@@ -159,52 +158,6 @@ public class SettingsGeneralViewModel : BindableBase
             key.DeleteValue("AiMux", false);
             LoggerHelper.Info("已移除开机自启");
         }
-    }
-
-    /// <summary>导出配置到 .aimux 文件（设置 + 平台列表）</summary>
-    public DelegateCommand ExportCommand { get; }
-
-    /// <summary>从 .aimux 文件导入配置，并重启应用以完全生效</summary>
-    public DelegateCommand ImportCommand { get; }
-
-    private void ExportConfig()
-    {
-        var dlg = new SaveFileDialog
-        {
-            Filter = "AiMux 配置 (*.aimux)|*.aimux|所有文件 (*.*)|*.*",
-            FileName = "aimux-config.aimux",
-            DefaultExt = ".aimux",
-            Title = "导出配置",
-        };
-        if (dlg.ShowDialog() != true) return;
-        try
-        {
-            _config.ExportConfig(dlg.FileName);
-            _ = MessageBoxHelper.Info("配置已导出到：\n" + dlg.FileName);
-        }
-        catch (Exception ex)
-        {
-            _ = MessageBoxHelper.Error("导出失败：" + ex.Message);
-        }
-    }
-
-    private void ImportConfig()
-    {
-        var dlg = new OpenFileDialog
-        {
-            Filter = "AiMux 配置 (*.aimux)|*.aimux|所有文件 (*.*)|*.*",
-            Title = "导入配置",
-        };
-        if (dlg.ShowDialog() != true) return;
-        var (ok, msg) = _config.ImportConfig(dlg.FileName);
-        if (!ok)
-        {
-            _ = MessageBoxHelper.Error(msg);
-            return;
-        }
-        _ = MessageBoxHelper.Info(msg + "，即将重启以应用全部配置…");
-        // 启动新实例后关闭当前，确保窗口/热键/平台/主题全部重新加载生效
-        RestartApp();
     }
 
     /// <summary>恢复默认配置：二次确认后清空所有用户数据并重启应用</summary>
