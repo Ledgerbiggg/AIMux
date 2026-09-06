@@ -54,6 +54,9 @@ public class SettingsPlatformViewModel : BindableBase
     private bool _enabled = true;
     public bool Enabled { get => _enabled; set => SetProperty(ref _enabled, value); }
 
+    private string _zoomPercent = "100";
+    public string ZoomPercent { get => _zoomPercent; set => SetProperty(ref _zoomPercent, value); }
+
     /// <summary>图标预览（缓存到本地后展示）</summary>
     private ImageSource? _iconPreview;
     public ImageSource? IconPreview
@@ -115,6 +118,7 @@ public class SettingsPlatformViewModel : BindableBase
         {
             Name = Url = IconLink = "";
             Enabled = true;
+            ZoomPercent = "100";
             IconPreview = null;
             return;
         }
@@ -123,6 +127,7 @@ public class SettingsPlatformViewModel : BindableBase
         // 若已配置的是图片链接则回填到链接框，本地路径则清空链接框（由预览展示）
         IconLink = IsUrl(Selected.Icon) ? Selected.Icon : "";
         Enabled = Selected.Enabled;
+        ZoomPercent = (Selected.ZoomPercent > 0 ? Selected.ZoomPercent : 100).ToString();
         IconPreview = LoadPreview(Selected.Icon);
     }
 
@@ -172,8 +177,17 @@ public class SettingsPlatformViewModel : BindableBase
         if (!string.IsNullOrEmpty(link))
             Selected.Icon = link;
         Selected.Enabled = Enabled;
+        Selected.ZoomPercent = ParseZoom(ZoomPercent);
         _platformService.Save(Platforms.ToList());
         _ = MessageBoxHelper.Info("平台已保存。");
+    }
+
+    /// <summary>解析缩放比例：非法/越界回退 100%</summary>
+    private static int ParseZoom(string text)
+    {
+        if (int.TryParse(text?.Trim(), out var z) && z >= 25 && z <= 500)
+            return z;
+        return 100;
     }
 
     /// <summary>自动抓取 favicon（异步，成功后更新预览并清空链接框，因为已改用本地图标）</summary>

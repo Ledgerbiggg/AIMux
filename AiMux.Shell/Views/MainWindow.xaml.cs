@@ -102,15 +102,10 @@ public partial class MainWindow : FluentWindow
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        // 整体 try-catch：OnLoaded 期间任何异常都不能导致闪退或界面出不来
+        // 消息钩子/托盘/热键已在 OnSourceInitialized 装配（静默启动时不经过 Show，Loaded 不会触发），
+        // 这里只负责首次平台加载与界面状态初始化
         try
         {
-            // 挂载窗口消息钩子：处理全局热键与单实例唤出
-            _hwndSource = PresentationSource.FromVisual(this) as HwndSource;
-            _hwndSource?.AddHook(WndProc);
-
-            _trayService.Show();
-
             // 首次加载默认平台：先让 WebView 初始化，界面先出来
             if (_vm.SelectedPlatform is not null)
                 await SwitchPlatformAsync(_vm.SelectedPlatform);
@@ -123,24 +118,31 @@ public partial class MainWindow : FluentWindow
             LoggerHelper.Error("OnLoaded 加载平台期间异常", ex);
         }
 
-        // 热键注册整体容错，绝不阻塞界面
-        try { RegisterHotkey(); }
-        catch (Exception ex) { LoggerHelper.Error("RegisterHotkey 异常", ex); }
-
         // 同步右上角主题按钮图标：当前为深色显示🌙，浅色显示☀
         if (ThemeToggleIcon != null)
             ThemeToggleIcon.Text = _settings.Theme.Equals("Dark", StringComparison.OrdinalIgnoreCase) ? "🌙" : "☀";
     }
 
-    /// <summary>窗口句柄创建后（显示前）触发：若配置了启动到托盘，直接隐藏，避免主界面闪一下</summary>
+    /// <summary>窗口句柄创建后触发（首次 Show 或静默启动的 EnsureHandle 均会触发）：
+    /// 装配消息钩子、托盘图标与全局热键。这些必须在 SourceInitialized 就绪——
+    /// 静默启动窗口从未显示、Loaded 不会触发，若仍放在 OnLoaded 会导致托盘/热键全部失效，窗口无法呼出</summary>
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
-        if (_settings.Behavior.StartHidden)
-        {
-            // 此时窗口尚未显示，Hide 不会闪；App.InitializeShell 在 StartHidden 时不会 Show 主窗口
-            Visibility = Visibility.Hidden;
-            ShowInTaskbar = false;
-        }
+        // 挂载窗口消息钩子：处理全局热键与单实例唤出。
+        // 静默启动时视觉树尚未布局，PresentationSource.FromVisual 可能取不到，必须用 FromHwnd
+        _hwndSource = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+        _hwndSource?.AddHook(WndProc);
+
+        // 托盘图标尽早显示：静默启动时这是用户唯一的可见入口（失败不阻塞启动）
+        try { _trayService.Show(); }
+        catch (Exception ex) { LoggerHelper.Error("托盘图标显示失败", ex); }
+
+        // 静默启动的 Visibility=Hidden / ShowInTaskbar=false 已由 App.InitializeShell
+        // 在 EnsureHandle 之前设置好（句柄创建后再改样式会闪任务栏图标），此处无需处理
+
+        // 热键注册整体容错，绝不阻塞界面；静默启动用户靠热键呼出窗口，必须在此注册
+        try { RegisterHotkey(); }
+        catch (Exception ex) { LoggerHelper.Error("RegisterHotkey 异常", ex); }
     }
 
     /// <summary>窗口消息处理：WM_HOTKEY 由 HotkeyManager 经 HotkeyPressed 事件分发到对应动作，
@@ -289,7 +291,7 @@ public partial class MainWindow : FluentWindow
 
             if (!_hosts.TryGetValue(item.Id, out var host))
             {
-                host = new WebViewHost(item.Info, _webViewService, _iconService, _platformService);
+                host = new WebViewHost(item.Info, _webViewService, _iconService, _platformService, _config);
                 host.AddressChanged += OnHostAddressChanged;
                 _hosts[item.Id] = host;
                 WebViewContainer.Children.Add(host);

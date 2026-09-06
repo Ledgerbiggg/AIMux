@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using System.Windows.Interop;
 using AiMux.Common.Config;
 using AiMux.Common.Hotkey;
 using AiMux.Models;
@@ -22,6 +23,9 @@ public partial class App : PrismApplication
 {
     /// <summary>单实例唤出消息（与主窗口 WndProc 约定一致）</summary>
     private const int WmShowInstance = 0x0401;
+
+    /// <summary>主窗口标题：第二实例按标题 FindWindow 查找已运行实例（与 MainViewModel.Title 保持一致）</summary>
+    private const string MainWindowTitle = "AI Chat Hub";
 
     private Mutex? _mutex;
     private bool _ownsMutex;
@@ -157,16 +161,61 @@ public partial class App : PrismApplication
         return Container.Resolve<MainWindow>();
     }
 
+    /// <summary>静默启动（StartHidden）时绝不调用 Show：Prism 默认实现会先 Show 主窗口，
+    /// 再由窗口把自身隐藏，Win32 层面窗口已被绘制出来，表现为"闪一下才消失"。
+    /// 这里改为只创建窗口句柄（EnsureHandle 不显示窗口），窗口从未显示过，天然无闪烁；
+    /// 句柄由 MainWindow.OnSourceInitialized 用于装配托盘、全局热键与单实例唤出消息</summary>
+    protected override void InitializeShell(Window shell)
+    {
+        var config = Container.Resolve<ConfigService>();
+        if (config.LoadSettings().Behavior.StartHidden)
+        {
+            // 保留主窗口引用（与 Prism 默认行为一致），托盘退出/单实例唤出依赖它
+            MainWindow = shell;
+            // 关键：WPF 创建 HWND 时只要 Visibility 属性为 Visible（默认值），
+            // 无论走 Show 还是 EnsureHandle，CreateWindowEx 都会带上 WS_VISIBLE 样式，
+            // 窗口创建即显示——这正是"EnsureHandle 了却照样弹窗"的原因。
+            // 必须在 EnsureHandle 之前置为 Hidden，HWND 才真正不可见，实现零闪烁
+            shell.Visibility = Visibility.Hidden;
+            // 任务栏图标也要在句柄创建前关掉：句柄创建后再改样式，任务栏图标可能闪现一下
+            shell.ShowInTaskbar = false;
+            // 只创建 HWND 不显示窗口：会触发 SourceInitialized（装配钩子/托盘/热键），不触发 Loaded
+            var handle = new WindowInteropHelper(shell).EnsureHandle();
+            // 静默窗口不经过布局，Title 绑定不会求值，HWND 标题为空——
+            // 第二实例 FindWindow 将找不到它，双击图标无法唤出。这里手动补上标题
+            SetWindowText(handle, MainWindowTitle);
+            return;
+        }
+        base.InitializeShell(shell);
+    }
+
+    /// <summary>Prism 默认在 OnInitialized 里调用 MainWindow?.Show()——
+    /// 静默启动"闪一下再隐藏"的真正元凶（InitializeShell 默认实现并不 Show，Show 藏在这一步）。
+    /// 只拦 InitializeShell 不够：隐藏的窗口会被这里的 Show 强行拉出来闪一下，
+    /// 随后又被 Visibility=Hidden 压回隐藏。静默启动时必须连这里一起跳过</summary>
+    protected override void OnInitialized()
+    {
+        var config = Container.Resolve<ConfigService>();
+        if (config.LoadSettings().Behavior.StartHidden)
+        {
+            return; // 不调 base：窗口从头到尾不被显示，零闪烁
+        }
+        base.OnInitialized();
+    }
+
     /// <summary>向已运行实例发送唤出消息（按窗口标题查找主窗口）</summary>
     private static void NotifyMainWindow()
     {
-        var hwnd = FindWindow(null, "AI Chat Hub");
+        var hwnd = FindWindow(null, MainWindowTitle);
         if (hwnd != IntPtr.Zero)
             PostMessage(hwnd, WmShowInstance, IntPtr.Zero, IntPtr.Zero);
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr FindWindow(string? className, string windowName);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool SetWindowText(IntPtr hWnd, string text);
 
     [DllImport("user32.dll")]
     private static extern bool PostMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);

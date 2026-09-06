@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using AiMux.Common.Config;
 using AiMux.Common.Logger;
 using AiMux.Models;
 using AiMux.Services.IService;
@@ -15,6 +16,7 @@ public partial class WebViewHost : UserControl
     private readonly IWebViewService _webViewService;
     private readonly IIconService _iconService;
     private readonly IPlatformService _platformService;
+    private readonly ConfigService _config;
     private bool _initialized;
 
     /// <summary>当前承载的平台配置</summary>
@@ -27,12 +29,13 @@ public partial class WebViewHost : UserControl
     public string CurrentUrl => WebView.CoreWebView2?.Source?.ToString() ?? Platform.Url;
 
     public WebViewHost(PlatformInfo platform, IWebViewService webViewService,
-        IIconService iconService, IPlatformService platformService)
+        IIconService iconService, IPlatformService platformService, ConfigService config)
     {
         Platform = platform;
         _webViewService = webViewService;
         _iconService = iconService;
         _platformService = platformService;
+        _config = config;
         InitializeComponent();
 
         // 占位层展示平台首字母与名称
@@ -55,6 +58,9 @@ public partial class WebViewHost : UserControl
             // 拦截新窗口请求：不让其弹出外部浏览器 / 独立窗口，统一改为「在当前 WebView 内打开，
             // 旧内容被替换」的通用行为（点开视频 / 链接都留在界面内，不脱离桌面）
             WebView.CoreWebView2.NewWindowRequested += CoreWebView2_OnNewWindowRequested;
+            // 订阅缩放变化：用户手动缩放（Ctrl+滚轮 / Ctrl+加减号）时记住，下次加载自动应用
+            WebView.ZoomFactorChanged += WebView_ZoomFactorChanged;
+            ApplyZoom();
             WebView.Source = new Uri(Platform.Url);
         }
         catch (Exception ex)
@@ -142,4 +148,41 @@ public partial class WebViewHost : UserControl
 
     /// <summary>刷新当前平台网页</summary>
     public void Reload() => WebView.Reload();
+
+    /// <summary>应用平台配置的默认缩放比例（百分数 → ZoomFactor；未配置/越界回退 100%）</summary>
+    private void ApplyZoom()
+    {
+        try
+        {
+            WebView.ZoomFactor = NormalizeZoom(Platform.ZoomPercent) / 100.0;
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Info($"应用缩放比例失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>用户手动缩放后触发（Ctrl+滚轮 / Ctrl+加减号）：把当前比例写回平台配置并持久化。
+    /// 程序主动设置同值时会被 Normalize 判定一致而跳过，避免重复落盘。</summary>
+    private void WebView_ZoomFactorChanged(object? sender, EventArgs e)
+    {
+        try
+        {
+            var percent = NormalizeZoom((int)Math.Round(WebView.ZoomFactor * 100));
+            if (percent == Platform.ZoomPercent)
+                return;
+
+            Platform.ZoomPercent = percent;
+            // 直接写 platforms.json，不触发 PlatformsChanged，避免缩放时重建平台列表导致主界面闪切
+            _config.SavePlatforms(_platformService.GetAll());
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Info($"保存缩放比例失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>把缩放百分数规范到合法区间（25 ~ 500），非法回退 100</summary>
+    private static int NormalizeZoom(int percent)
+        => percent is >= 25 and <= 500 ? percent : 100;
 }

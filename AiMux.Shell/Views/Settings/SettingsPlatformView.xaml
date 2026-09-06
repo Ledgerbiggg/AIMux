@@ -99,6 +99,12 @@
                 <TextBlock Style="{StaticResource FormHelpStyle}"
                            Text="直接粘贴一张图片链接作为图标；留空则使用上方抓取到的 favicon。" />
 
+                <TextBlock Style="{StaticResource FormLabelStyle}" Text="默认缩放比例（%）" Margin="0,16,0,0" />
+                <TextBox Text="{Binding ZoomPercent, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormTextBoxStyle}"
+                         ToolTip="加载该平台时自动应用的缩放比例，默认 100" />
+                <TextBlock Style="{StaticResource FormHelpStyle}"
+                           Text="部分网站在窗口尺寸下 100% 显示不佳，可在此设置默认缩放（如 125）。加载该网站时自动应用。" />
+
                 <CheckBox Content="在侧边栏显示此平台" IsChecked="{Binding Enabled}" Margin="0,16,0,0" />
 
                 <Grid Margin="0,22,0,0">

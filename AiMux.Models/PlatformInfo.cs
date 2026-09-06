@@ -30,4 +30,7 @@ public class PlatformInfo
     /// <summary>可选角标标签，如 ChatGPT 的"代理"提示</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public string Badge { get; set; } = "";
+
+    /// <summary>默认缩放比例（百分数，100 = 100%）。加载该平台时自动应用；0 或越界视为 100%。</summary>
+    public int ZoomPercent { get; set; } = 100;
 }
