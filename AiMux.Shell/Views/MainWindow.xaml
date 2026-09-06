@@ -245,11 +245,11 @@
                 </Border>
 
                 <!-- WebView2 内容区：多平台实例叠放，切换时 Visibility 控制，不销毁保留上下文。
-                     在右侧 / 下侧 / 右下角 6px 内拦截鼠标，实现整屏缩放（绕过 WebView 吞掉系统 resize） -->
-                <Grid x:Name="WebViewContainer" Grid.Row="1" Background="{DynamicResource ControlFillColorDefaultBrush}"
-                      PreviewMouseMove="WebViewContainer_PreviewMouseMove"
-                      PreviewMouseLeftButtonDown="WebViewContainer_PreviewMouseLeftButtonDown"
-                      PreviewMouseLeftButtonUp="WebViewContainer_PreviewMouseLeftButtonUp" />
+                     右/下各留 8px 边距：WebView2 是原生子窗口会截获鼠标消息（WPF Preview 事件也收不到），
+                     铺满边缘会导致窗口右/下边缘及右下角无法缩放；留出的空隙由窗口命中，
+                     WindowChrome 在此显示缩放光标并支持拖拽调整大小 -->
+                <Grid x:Name="WebViewContainer" Grid.Row="1" Margin="0,0,8,8"
+                      Background="{DynamicResource ControlFillColorDefaultBrush}" />
             </Grid>
         </Grid>
     </Grid>

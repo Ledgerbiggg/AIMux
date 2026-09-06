@@ -420,66 +420,6 @@ public partial class MainWindow : FluentWindow
         }
     }
 
-    /// <summary>WebView 区域边缘缩放：在右侧 / 下侧 / 右下角 6px 内拦截鼠标，
-    /// 绕过 WebView2 吞掉系统 resize 的问题，实现整屏宽度 / 高度拖拽缩放</summary>
-    private const double ResizeEdge = 6;
-    private bool _resizing;
-    private bool _resizeRight, _resizeBottom;
-    private Point _resizeStart;
-    private double _startWidth, _startHeight;
-
-    private void WebViewContainer_PreviewMouseMove(object sender, MouseEventArgs e)
-    {
-        var pt = e.GetPosition(this);
-        bool right = pt.X >= ActualWidth - ResizeEdge;
-        bool bottom = pt.Y >= ActualHeight - ResizeEdge;
-
-        if (_resizing && e.LeftButton == MouseButtonState.Pressed)
-        {
-            var now = e.GetPosition(this);
-            if (_resizeRight)
-                Width = Math.Max(MinWidth, _startWidth + (now.X - _resizeStart.X));
-            if (_resizeBottom)
-                Height = Math.Max(MinHeight, _startHeight + (now.Y - _resizeStart.Y));
-            e.Handled = true;
-            return;
-        }
-
-        if (right && bottom) this.Cursor = Cursors.SizeNWSE;
-        else if (right) this.Cursor = Cursors.SizeWE;
-        else if (bottom) this.Cursor = Cursors.SizeNS;
-        else if (this.Cursor != Cursors.Arrow) this.Cursor = Cursors.Arrow;
-    }
-
-    private void WebViewContainer_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        var pt = e.GetPosition(this);
-        bool right = pt.X >= ActualWidth - ResizeEdge;
-        bool bottom = pt.Y >= ActualHeight - ResizeEdge;
-        if (right || bottom)
-        {
-            _resizing = true;
-            _resizeRight = right;
-            _resizeBottom = bottom;
-            _resizeStart = e.GetPosition(this);
-            _startWidth = Width;
-            _startHeight = Height;
-            e.Handled = true; // 阻止事件传入 WebView，避免误触网页
-            Mouse.Capture(this);
-        }
-    }
-
-    private void WebViewContainer_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        if (_resizing)
-        {
-            _resizing = false;
-            _resizeRight = _resizeBottom = false;
-            Mouse.Capture(null);
-            this.Cursor = Cursors.Arrow;
-        }
-    }
-
     /// <summary>缩放按钮：切换窗口大 / 小尺寸，并联动侧边栏折叠状态
     /// 缩小窗口 → 侧栏收起；放大窗口 → 侧栏展开。侧栏的单独折叠按钮仍只管侧栏</summary>
     private void ToggleCompact_Click(object sender, RoutedEventArgs e)
