@@ -18,6 +18,9 @@ public class WebDavService : IWebDavService
     {
         // 允许自签名证书，WebDAV 服务器常用自签证书
         ServerCertificateCustomValidationCallback = (_, _, _, _) => true,
+        // 自动解压 gzip/deflate/br：部分 WebDAV 网关/反向代理会对响应做压缩，
+        // 未启用解压时拿到的是压缩字节流，JSON 解析必然失败（表现为"文件已损坏"）
+        AutomaticDecompression = DecompressionMethods.All,
     };
 
     private static readonly HttpClient Client = new(Handler)
@@ -233,23 +236,57 @@ public class WebDavService : IWebDavService
             }
 
             // 2. 下载到临时文件
-            await using var src = await resp.Content.ReadAsStreamAsync();
-            await using var fs = File.Create(tmpFile);
-            await src.CopyToAsync(fs);
-            await fs.FlushAsync();
+            // 注意：写句柄必须在此块内释放——File.Create 默认 FileShare.None，
+            // 若句柄滞留到方法末尾，下方 File.ReadAllTextAsync 重开同一文件会抛"文件被另一进程占用"
+            {
+                await using var src = await resp.Content.ReadAsStreamAsync();
+                await using var fs = new FileStream(tmpFile, FileMode.Create, FileAccess.Write, FileShare.Read);
+                await src.CopyToAsync(fs);
+                await fs.FlushAsync();
+            }
 
-            // 3. 校验文件有效性（尝试解析）
+            // 3. 校验文件有效性（尝试解析）；失败时把诊断信息写入日志，便于定位真实原因
+            var contentType = resp.Content.Headers.ContentType?.MediaType ?? "";
+            string json;
             try
             {
-                var json = await File.ReadAllTextAsync(tmpFile);
+                json = await File.ReadAllTextAsync(tmpFile);
+            }
+            catch (Exception ex)
+            {
+                LoggerHelper.Error($"WebDAV 拉取的临时文件读取失败: {tmpFile}, Content-Type={contentType}", ex);
+                return new WebDavResult { Ok = false, Message = "下载内容读取失败，详见日志" };
+            }
+
+            var head = json.Length > 200 ? json[..200] + "…" : json;
+            var diag = $"url={BuildFileUrl()}, Content-Type={contentType}, 长度={json.Length}, 内容预览={head}";
+
+            // 常见场景：服务器对 GET 返回网页（软 404 / 登录页 / 重定向页）而非文件，明确区分提示
+            if (contentType.Contains("html", StringComparison.OrdinalIgnoreCase)
+                || json.TrimStart().StartsWith('<'))
+            {
+                LoggerHelper.Error($"WebDAV 拉取到的是网页而非配置文件: {diag}");
+                return new WebDavResult
+                {
+                    Ok = false,
+                    Message = "服务器返回的是网页而不是配置文件，请检查 WebDAV 地址是否填错（应填 WebDAV 服务地址，而非网页端地址）",
+                };
+            }
+
+            try
+            {
                 using var doc = JsonDocument.Parse(json);
                 if (!doc.RootElement.TryGetProperty("Settings", out _) ||
                     !doc.RootElement.TryGetProperty("Platforms", out _))
-                    return new WebDavResult { Ok = false, Message = "远程配置文件格式不正确或已损坏" };
+                {
+                    LoggerHelper.Error($"WebDAV 远程配置缺少 Settings/Platforms 字段: {diag}");
+                    return new WebDavResult { Ok = false, Message = "远程配置文件格式不正确或已损坏（详见日志）" };
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                return new WebDavResult { Ok = false, Message = "远程配置文件解析失败，可能已损坏" };
+                LoggerHelper.Error($"WebDAV 远程配置 JSON 解析失败: {diag}", ex);
+                return new WebDavResult { Ok = false, Message = "远程配置文件解析失败，可能已损坏（详见日志）" };
             }
 
             // 4. 导入配置
