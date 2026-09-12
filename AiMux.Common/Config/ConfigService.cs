@@ -72,11 +72,14 @@ public class ConfigService
     /// <summary>读取全局设置；文件缺失返回默认设置</summary>
     public AppSettings LoadSettings() => Load(SettingsPath, new AppSettings());
 
-    /// <summary>保存全局设置到 settings.json</summary>
-    public void SaveSettings(AppSettings settings)
+    /// <summary>保存全局设置到 settings.json。
+    /// raiseEvent=false 为静默写盘（不触发 SettingsSaved）：供内部字段写回（如同步时间）使用，
+    /// 既避免主窗口无谓地重注册热键，也防止「保存→自动同步→写时间→再触发同步」的递归</summary>
+    public void SaveSettings(AppSettings settings, bool raiseEvent = true)
     {
         Save(SettingsPath, settings);
-        SettingsSaved?.Invoke(this, EventArgs.Empty);
+        if (raiseEvent)
+            SettingsSaved?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>全局设置变更事件（主窗口据此重新注册热键/刷新状态）</summary>

@@ -62,8 +62,15 @@ public class HotkeyActionDescConverter : IValueConverter
         {
             HotkeyAction.ToggleWindow => "呼出/隐藏主窗口",
             HotkeyAction.ToggleSidebar => "展开/折叠侧边栏",
+            HotkeyAction.ToggleSize => "切换大窗/小窗尺寸",
+            HotkeyAction.ToggleSettings => "打开/关闭设置窗口",
             HotkeyAction.PrevPlatform => "切换到上一个平台（循环）",
             HotkeyAction.NextPlatform => "切换到下一个平台（循环）",
+            // 已停用的旧动作：不再出现在设置页，仅旧配置里残留数字时兜底显示
+            HotkeyAction.ToggleMiniMode => "已停用：摸鱼模式改用 Esc 进/出，不再使用热键",
+            HotkeyAction.ToggleMiniOrientation => "摸鱼模式切换横屏/竖屏",
+            HotkeyAction.WebBack => "网页后退（浏览器历史上一层）",
+            HotkeyAction.WebForward => "网页前进（浏览器历史下一层）",
             _ => action.ToString(),
         };
     }

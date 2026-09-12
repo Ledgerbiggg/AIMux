@@ -17,9 +17,9 @@ public class SettingsHotkeyViewModel : BindableBase
     private readonly ConfigService _config;
     private readonly AppSettings _settings;
 
-    /// <summary>所有可用的热键动作（供 DataGrid/ComboBox 绑定）</summary>
+    /// <summary>所有可用的热键动作（供 DataGrid/ComboBox 绑定；「打开设置」已永久下线不提供热键）</summary>
     public IReadOnlyList<HotkeyAction> AvailableActions { get; } =
-        Enum.GetValues<HotkeyAction>().ToList();
+        Enum.GetValues<HotkeyAction>().Where(a => a != HotkeyAction.ToggleSettings).ToList();
 
     /// <summary>热键绑定列表（每行可独立录制）</summary>
     public ObservableCollection<HotkeyRowViewModel> Rows { get; } = [];
@@ -32,55 +32,69 @@ public class SettingsHotkeyViewModel : BindableBase
         _config = config;
         _settings = config.LoadSettings();
 
-        // 始终显示六行热键（写死动作，可各自录制组合键）：
-        // 呼出窗口(Alt+Q，全局) / 折叠侧栏(Alt+E) / 切换尺寸(Alt+W) / 打开设置(Alt+S) /
-        // 上一个平台(Alt+←) / 下一个平台(Alt+→)
-        // 其中侧栏/尺寸/设置/切换仅在主窗口聚焦时生效；有配置就用配置，否则填默认
+        // 始终显示八行热键（写死动作，可各自录制组合键）：
+        // 呼出窗口(Alt+Q，全局) / 切换尺寸(Alt+W) / 折叠侧栏(Alt+E) /
+        // 上一个平台(Alt+↑) / 下一个平台(Alt+↓) / 摸鱼横竖屏(Alt+R) /
+        // 网页后退(Alt+←) / 网页前进(Alt+→)
+        // 摸鱼模式进出刻意不占热键：统一走 Esc（大窗进入、小窗退出）。
+        // 「打开设置」已永久下线：不注册、不迁移、不显示，设置走主界面按钮。
+        // 其中侧栏/尺寸/网页导航仅在主窗口聚焦时生效；有配置就用配置，否则填默认
         var toggleWindowBinding = _settings.Hotkeys.FirstOrDefault(h => h.Action == HotkeyAction.ToggleWindow)
             ?? new HotkeyBinding { Action = HotkeyAction.ToggleWindow, Modifier = "Alt", Key = "Q" };
         var toggleSizeBinding = _settings.Hotkeys.FirstOrDefault(h => h.Action == HotkeyAction.ToggleSize)
             ?? new HotkeyBinding { Action = HotkeyAction.ToggleSize, Modifier = "Alt", Key = "W" };
         var toggleSidebarBinding = _settings.Hotkeys.FirstOrDefault(h => h.Action == HotkeyAction.ToggleSidebar)
             ?? new HotkeyBinding { Action = HotkeyAction.ToggleSidebar, Modifier = "Alt", Key = "E" };
-        var toggleSettingsBinding = _settings.Hotkeys.FirstOrDefault(h => h.Action == HotkeyAction.ToggleSettings)
-            ?? new HotkeyBinding { Action = HotkeyAction.ToggleSettings, Modifier = "Alt", Key = "S" };
         var prevPlatformBinding = _settings.Hotkeys.FirstOrDefault(h => h.Action == HotkeyAction.PrevPlatform)
-            ?? new HotkeyBinding { Action = HotkeyAction.PrevPlatform, Modifier = "Alt", Key = "Left" };
+            ?? new HotkeyBinding { Action = HotkeyAction.PrevPlatform, Modifier = "Alt", Key = "Up" };
         var nextPlatformBinding = _settings.Hotkeys.FirstOrDefault(h => h.Action == HotkeyAction.NextPlatform)
-            ?? new HotkeyBinding { Action = HotkeyAction.NextPlatform, Modifier = "Alt", Key = "Right" };
+            ?? new HotkeyBinding { Action = HotkeyAction.NextPlatform, Modifier = "Alt", Key = "Down" };
+        var toggleMiniOrientationBinding = _settings.Hotkeys.FirstOrDefault(h => h.Action == HotkeyAction.ToggleMiniOrientation)
+            ?? new HotkeyBinding { Action = HotkeyAction.ToggleMiniOrientation, Modifier = "Alt", Key = "R" };
+        var webBackBinding = _settings.Hotkeys.FirstOrDefault(h => h.Action == HotkeyAction.WebBack)
+            ?? new HotkeyBinding { Action = HotkeyAction.WebBack, Modifier = "Alt", Key = "Left" };
+        var webForwardBinding = _settings.Hotkeys.FirstOrDefault(h => h.Action == HotkeyAction.WebForward)
+            ?? new HotkeyBinding { Action = HotkeyAction.WebForward, Modifier = "Alt", Key = "Right" };
 
         Rows.Add(new HotkeyRowViewModel(toggleWindowBinding));
         Rows.Add(new HotkeyRowViewModel(toggleSizeBinding));
         Rows.Add(new HotkeyRowViewModel(toggleSidebarBinding));
-        Rows.Add(new HotkeyRowViewModel(toggleSettingsBinding));
         Rows.Add(new HotkeyRowViewModel(prevPlatformBinding));
         Rows.Add(new HotkeyRowViewModel(nextPlatformBinding));
+        Rows.Add(new HotkeyRowViewModel(toggleMiniOrientationBinding));
+        Rows.Add(new HotkeyRowViewModel(webBackBinding));
+        Rows.Add(new HotkeyRowViewModel(webForwardBinding));
 
         SaveCommand = new DelegateCommand(Save);
         ResetCommand = new DelegateCommand(Reset);
     }
 
-    /// <summary>恢复默认值：Alt+Q 窗口(全局)、Alt+E 侧栏、Alt+W 尺寸、Alt+S 设置、Alt+← 上一平台、Alt+→ 下一平台。
-    /// 保留六行不清除，方便直接修改</summary>
+    /// <summary>恢复默认值：Alt+Q 窗口(全局)、Alt+E 侧栏、Alt+W 尺寸、Alt+↑/↓ 切平台、Alt+R 摸鱼横竖屏、Alt+←/→ 网页导航。
+    /// 保留八行不清除，方便直接修改</summary>
     private void Reset()
     {
-        // 始终保留六行，恢复默认组合键而非清空
-        if (Rows.Count == 0)
+        // 始终保留八行，恢复默认组合键而非清空
+        if (Rows.Count < 8)
         {
+            Rows.Clear();
             Rows.Add(new HotkeyRowViewModel(new HotkeyBinding { Action = HotkeyAction.ToggleWindow }));
             Rows.Add(new HotkeyRowViewModel(new HotkeyBinding { Action = HotkeyAction.ToggleSize }));
             Rows.Add(new HotkeyRowViewModel(new HotkeyBinding { Action = HotkeyAction.ToggleSidebar }));
-            Rows.Add(new HotkeyRowViewModel(new HotkeyBinding { Action = HotkeyAction.ToggleSettings }));
             Rows.Add(new HotkeyRowViewModel(new HotkeyBinding { Action = HotkeyAction.PrevPlatform }));
             Rows.Add(new HotkeyRowViewModel(new HotkeyBinding { Action = HotkeyAction.NextPlatform }));
+            Rows.Add(new HotkeyRowViewModel(new HotkeyBinding { Action = HotkeyAction.ToggleMiniOrientation }));
+            Rows.Add(new HotkeyRowViewModel(new HotkeyBinding { Action = HotkeyAction.WebBack }));
+            Rows.Add(new HotkeyRowViewModel(new HotkeyBinding { Action = HotkeyAction.WebForward }));
         }
         Rows[0].Modifier = "Alt"; Rows[0].Key = "Q";
         Rows[1].Modifier = "Alt"; Rows[1].Key = "W";
         Rows[2].Modifier = "Alt"; Rows[2].Key = "E";
-        Rows[3].Modifier = "Alt"; Rows[3].Key = "S";
-        Rows[4].Modifier = "Alt"; Rows[4].Key = "Left";
-        Rows[5].Modifier = "Alt"; Rows[5].Key = "Right";
-        _ = MessageBoxHelper.Info("已恢复默认：Alt+Q 窗口，Alt+W 尺寸，Alt+E 侧栏，Alt+S 设置，Alt+← 上一平台，Alt+→ 下一平台。");
+        Rows[3].Modifier = "Alt"; Rows[3].Key = "Up";
+        Rows[4].Modifier = "Alt"; Rows[4].Key = "Down";
+        Rows[5].Modifier = "Alt"; Rows[5].Key = "R";
+        Rows[6].Modifier = "Alt"; Rows[6].Key = "Left";
+        Rows[7].Modifier = "Alt"; Rows[7].Key = "Right";
+        _ = MessageBoxHelper.Info("已恢复默认：Alt+Q 窗口，Alt+W 尺寸，Alt+E 侧栏，Alt+↑/↓ 切平台，Alt+R 摸鱼横竖屏，Alt+←/→ 网页后退/前进。摸鱼模式不占热键：大窗按 Esc 进入、小窗按 Esc 退出。");
     }
 
     /// <summary>保存前逻辑校验：每条需有按键，且同一组合键不能被多个动作重复占用。
@@ -126,10 +140,39 @@ public class SettingsHotkeyViewModel : BindableBase
     }
 }
 
-/// <summary>单行热键绑定：动作 + 修饰键 + 按键 + 录制状态</summary>
+/// <summary>单行热键绑定：动作 + 修饰键 + 按键 + 录制状态。
+/// 修饰键/按键可直接用下拉框选（实例属性持有静态列表，绑定兼容性最好），
+/// 「录制」按钮保留：直接按组合键自动捕获，且支持下拉里没有的冷门键位</summary>
 public class HotkeyRowViewModel : BindableBase
 {
     public HotkeyBinding Model { get; }
+
+    /// <summary>修饰键下拉候选（含常见多键组合；与 ModifiersToString 的 "+" 拼接格式一致）</summary>
+    public IReadOnlyList<string> AvailableModifiers { get; } =
+    [
+        "Alt", "Ctrl", "Shift", "Win",
+        "Ctrl+Alt", "Ctrl+Shift", "Alt+Shift", "Ctrl+Alt+Shift",
+        "Win+Alt", "Win+Ctrl", "Win+Shift", "Win+Ctrl+Alt",
+    ];
+
+    /// <summary>按键下拉候选（字母/数字/F1~F12/方向键/常用编辑键/符号）</summary>
+    public IReadOnlyList<string> AvailableKeys { get; } = BuildAvailableKeys();
+
+    private static IReadOnlyList<string> BuildAvailableKeys()
+    {
+        var keys = new List<string>(96);
+        for (var c = 'A'; c <= 'Z'; c++) keys.Add(c.ToString());
+        for (var n = 0; n <= 9; n++) keys.Add(n.ToString());
+        for (var f = 1; f <= 12; f++) keys.Add($"F{f}");
+        keys.AddRange(
+        [
+            "Up", "Down", "Left", "Right",
+            "Space", "Tab", "Enter", "Back",
+            "Insert", "Delete", "Home", "End", "PageUp", "PageDown",
+            "`", "-", "=", "[", "]", "\\", ";", "'", ",", ".", "/",
+        ]);
+        return keys;
+    }
 
     public HotkeyAction Action
     {

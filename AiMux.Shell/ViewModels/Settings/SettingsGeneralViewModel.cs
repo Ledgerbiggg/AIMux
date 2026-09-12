@@ -53,11 +53,12 @@ public class SettingsGeneralViewModel : BindableBase
         set => SetProperty(ref _rememberPosition, value);
     }
 
-    // —— 小窗 / 大窗尺寸（滑块可调，带范围限制，防止过小导致界面不可用）——
-    public const double CompactWidthMin = 360, CompactWidthMax = 900;
-    public const double CompactHeightMin = 480, CompactHeightMax = 1100;
-    public const double FullWidthMin = 800, FullWidthMax = 2560;
-    public const double FullHeightMin = 600, FullHeightMax = 1600;
+    // —— 小窗 / 大窗尺寸（滑块可调；范围放宽到接近整屏，配置文件里手动填写的
+    // 合理值不会被打开设置页后保存时截断）——
+    public const double CompactWidthMin = 200, CompactWidthMax = 3840;
+    public const double CompactHeightMin = 200, CompactHeightMax = 2160;
+    public const double FullWidthMin = 400, FullWidthMax = 3840;
+    public const double FullHeightMin = 300, FullHeightMax = 2160;
 
     private double _compactWidth;
     public double CompactWidth
@@ -87,6 +88,41 @@ public class SettingsGeneralViewModel : BindableBase
         set => SetProperty(ref _fullHeight, Clamp(value, FullHeightMin, FullHeightMax));
     }
 
+    // —— 摸鱼模式小窗尺寸（横屏看视频 / 竖屏刷短视频；下限与 MainWindow 摸鱼模式的
+    //    MinWidth=200 / MinHeight=120 对齐，低于下限的值会被窗口最小尺寸夹住）——
+    public const double MiniLandscapeWidthMin = 200, MiniLandscapeWidthMax = 1920;
+    public const double MiniLandscapeHeightMin = 120, MiniLandscapeHeightMax = 1080;
+    public const double MiniPortraitWidthMin = 200, MiniPortraitWidthMax = 1080;
+    public const double MiniPortraitHeightMin = 200, MiniPortraitHeightMax = 1920;
+
+    private double _miniLandscapeWidth;
+    public double MiniLandscapeWidth
+    {
+        get => _miniLandscapeWidth;
+        set => SetProperty(ref _miniLandscapeWidth, Clamp(value, MiniLandscapeWidthMin, MiniLandscapeWidthMax));
+    }
+
+    private double _miniLandscapeHeight;
+    public double MiniLandscapeHeight
+    {
+        get => _miniLandscapeHeight;
+        set => SetProperty(ref _miniLandscapeHeight, Clamp(value, MiniLandscapeHeightMin, MiniLandscapeHeightMax));
+    }
+
+    private double _miniPortraitWidth;
+    public double MiniPortraitWidth
+    {
+        get => _miniPortraitWidth;
+        set => SetProperty(ref _miniPortraitWidth, Clamp(value, MiniPortraitWidthMin, MiniPortraitWidthMax));
+    }
+
+    private double _miniPortraitHeight;
+    public double MiniPortraitHeight
+    {
+        get => _miniPortraitHeight;
+        set => SetProperty(ref _miniPortraitHeight, Clamp(value, MiniPortraitHeightMin, MiniPortraitHeightMax));
+    }
+
     private static double Clamp(double v, double min, double max) => v < min ? min : (v > max ? max : v);
 
     /// <summary>当前程序版本号（取自程序集版本，供关于/更新使用）</summary>
@@ -111,12 +147,16 @@ public class SettingsGeneralViewModel : BindableBase
         CompactHeight = _settings.Window.CompactHeight;
         FullWidth = _settings.Window.FullWidth;
         FullHeight = _settings.Window.FullHeight;
+        MiniLandscapeWidth = _settings.Window.MiniLandscapeWidth;
+        MiniLandscapeHeight = _settings.Window.MiniLandscapeHeight;
+        MiniPortraitWidth = _settings.Window.MiniPortraitWidth;
+        MiniPortraitHeight = _settings.Window.MiniPortraitHeight;
         SaveCommand = new DelegateCommand(Save);
         ResetCommand = new DelegateCommand(ResetToDefault);
         Version = MainViewModel.GetVersionString();
     }
 
-    /// <summary>保存通用设置到 settings.json</summary>
+    /// <summary>保存通用设置到 settings.json（全覆盖写盘）</summary>
     private void Save()
     {
         _settings.Behavior.DefaultPlatformId = DefaultPlatformId;
@@ -127,6 +167,10 @@ public class SettingsGeneralViewModel : BindableBase
         _settings.Window.CompactHeight = Clamp(CompactHeight, CompactHeightMin, CompactHeightMax);
         _settings.Window.FullWidth = Clamp(FullWidth, FullWidthMin, FullWidthMax);
         _settings.Window.FullHeight = Clamp(FullHeight, FullHeightMin, FullHeightMax);
+        _settings.Window.MiniLandscapeWidth = Clamp(MiniLandscapeWidth, MiniLandscapeWidthMin, MiniLandscapeWidthMax);
+        _settings.Window.MiniLandscapeHeight = Clamp(MiniLandscapeHeight, MiniLandscapeHeightMin, MiniLandscapeHeightMax);
+        _settings.Window.MiniPortraitWidth = Clamp(MiniPortraitWidth, MiniPortraitWidthMin, MiniPortraitWidthMax);
+        _settings.Window.MiniPortraitHeight = Clamp(MiniPortraitHeight, MiniPortraitHeightMin, MiniPortraitHeightMax);
         _config.SaveSettings(_settings);
         _ = MessageBoxHelper.Info("通用设置已保存。");
     }

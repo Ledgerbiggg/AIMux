@@ -106,7 +106,7 @@ public class SettingsSyncViewModel : BindableBase
         ImportCommand = new DelegateCommand(ImportConfig);
     }
 
-    /// <summary>保存 WebDAV 配置到 settings.json</summary>
+    /// <summary>保存 WebDAV 配置到 settings.json（全覆盖写盘）</summary>
     private void Save()
     {
         _settings.WebDav.ServerUrl = ServerUrl.Trim();
@@ -231,10 +231,10 @@ public class SettingsSyncViewModel : BindableBase
         _config.SaveSettings(_settings);
     }
 
-    /// <summary>更新上次同步时间显示</summary>
+    /// <summary>更新上次同步时间显示（读磁盘最新配置：上传/下载成功后可实时刷新）</summary>
     private void UpdateLastSyncDisplay()
     {
-        var raw = _settings.WebDav.LastSyncTime;
+        var raw = _config.LoadSettings().WebDav.LastSyncTime;
         if (string.IsNullOrEmpty(raw))
         {
             LastSyncDisplay = "从未同步";

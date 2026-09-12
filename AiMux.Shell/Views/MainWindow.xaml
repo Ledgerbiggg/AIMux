@@ -10,6 +10,7 @@
                   Height="760" Width="1180"
                   MinHeight="480" MinWidth="420"
                   SizeChanged="MainWindow_OnSizeChanged"
+                  PreviewKeyDown="MainWindow_OnPreviewKeyDown"
                   Closing="MainWindow_OnClosing"
                   Closed="MainWindow_OnClosed">
     <Grid>
@@ -160,7 +161,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- 浏览器式导航条：左侧通用地址栏（粘贴网址回车即在当前窗口打开）+ 右侧工具按钮 -->
-                <Border Grid.Row="0" Background="{DynamicResource ControlFillColorDefaultBrush}"
+                <Border x:Name="NavBarBorder" Grid.Row="0" Background="{DynamicResource ControlFillColorDefaultBrush}"
                         BorderBrush="{DynamicResource ControlElevationBorderBrush}" BorderThickness="0,0,0,1">
                     <Grid Margin="8,0,14,0" Height="44">
                         <Grid.ColumnDefinitions>
@@ -190,7 +191,7 @@
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
                             <!-- 回到当前平台主页（平台配置 URL）；已在主页时自动禁用，避免误触 -->
-                            <Button Grid.Column="2" Style="{StaticResource TopBarButtonStyle}" Command="{Binding HomeCommand}"
+                            <Button x:Name="HomeButton" Grid.Column="2" Style="{StaticResource TopBarButtonStyle}" Command="{Binding HomeCommand}"
                                     Width="34" Height="30" Padding="0" Margin="4,0,0,0"
                                     ToolTip="回到当前平台主页">
                                 <TextBlock Text="🏠" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -219,7 +220,7 @@
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
                             <!-- 刷新当前网页 -->
-                            <Button Style="{StaticResource TopBarButtonStyle}" Command="{Binding ReloadCommand}"
+                            <Button x:Name="ReloadButton" Style="{StaticResource TopBarButtonStyle}" Command="{Binding ReloadCommand}"
                                     Width="34" Height="34" Padding="0" Margin="4,0,0,0">
                                 <TextBlock Text="↻" FontSize="15" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -240,8 +241,31 @@
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
+                            <!-- 摸鱼模式：一点即变身为无边框小窗（隐藏标题栏/侧栏/导航条），
+                                 Esc 进/出（大窗按进入、小窗按退出）、Alt+R 切横竖屏，退出后完整还原原窗口 -->
+                            <Button x:Name="MiniModeButton" Style="{StaticResource TopBarButtonStyle}" Click="MiniMode_Click"
+                                    Width="34" Height="34" Padding="0" Margin="4,0,0,0"
+                                    ToolTip="摸鱼模式：无边框小窗（大窗按 Esc 进入 / 小窗按 Esc 退出，Alt+R 切横竖屏）">
+                                <TextBlock x:Name="MiniModeIcon" Text="🐟" FontSize="14"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
                         </StackPanel>
                     </Grid>
+                </Border>
+
+                <!-- 摸鱼模式顶部条（仅摸鱼模式显示）：就一条 8px 隐形热区——按住拖动整窗，右键退出摸鱼。
+                     刻意不做"悬停浮出工具条"：它属于独立 Grid 行，浮出时会挤压 WebView 行高，
+                     悬停/移出反复触发布局伸缩，画面抖得很明显，看视频很影响观感。
+                     退出统一走 Esc（网页内也生效），右键是备用出口，全部不占屏幕。
+                     必须是独立 Grid 行而不是覆盖在 WebView 上——WebView2 是原生子窗口，
+                     任何 WPF 覆盖层都会被它遮挡（airspace 限制） -->
+                <Border x:Name="MiniTopBar" Grid.Row="0" Visibility="Collapsed"
+                        Background="{DynamicResource ControlFillColorDefaultBrush}">
+                    <Border x:Name="MiniDragStrip" Height="8" Background="Transparent" Cursor="SizeAll"
+                            MouseLeftButtonDown="MiniDragStrip_MouseLeftButtonDown"
+                            MouseRightButtonDown="MiniDragStrip_MouseRightButtonDown"
+                            ToolTip="按住拖动窗口；按 Esc 或右键退出摸鱼模式" />
                 </Border>
 
                 <!-- WebView2 内容区：多平台实例叠放，切换时 Visibility 控制，不销毁保留上下文。

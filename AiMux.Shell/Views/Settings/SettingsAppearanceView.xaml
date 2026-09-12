@@ -11,6 +11,18 @@
             <RadioButton GroupName="Theme" Content="浅色（默认）" IsChecked="{Binding IsLight}" />
             <RadioButton GroupName="Theme" Content="深色" IsChecked="{Binding IsDark}" Margin="0,10,0,0" />
 
+            <!-- 主界面按钮显隐：取消勾选即隐藏对应按钮，让导航条更清爽 -->
+            <TextBlock Style="{StaticResource FormLabelStyle}" Text="主界面按钮" Margin="0,26,0,0" />
+            <TextBlock Style="{StaticResource FormHelpStyle}" Margin="0,2,0,4"
+                       Text="取消勾选可隐藏顶部导航条上的对应按钮（下次保存后生效）" />
+            <CheckBox Content="复制链接（📋）" IsChecked="{Binding ShowCopyUrl}" />
+            <CheckBox Content="回到主页（🏠）" IsChecked="{Binding ShowHome}" />
+            <CheckBox Content="放大/缩小窗口（↗）" IsChecked="{Binding ShowCompactToggle}" />
+            <CheckBox Content="刷新网页（↻）" IsChecked="{Binding ShowReload}" />
+            <CheckBox Content="切换主题（🌙/☀）" IsChecked="{Binding ShowThemeToggle}" />
+            <CheckBox Content="置顶窗口（📌）" IsChecked="{Binding ShowPinToggle}" />
+            <CheckBox Content="摸鱼模式（🐟）" IsChecked="{Binding ShowMiniMode}" />
+
             <Button Style="{StaticResource MiniPrimaryButtonStyle}" Command="{Binding SaveCommand}"
                     Content="应用" Padding="24,6" Margin="0,22,0,0" HorizontalAlignment="Left" />
         </StackPanel>

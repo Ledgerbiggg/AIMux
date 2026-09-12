@@ -186,9 +186,10 @@ public class WebDavService : IWebDavService
                 return new WebDavResult { Ok = false, Message = msg };
             }
 
-            // 4. 记录同步时间
+            // 4. 记录同步时间（raiseEvent=false：不触发 SettingsSaved，
+            // 否则「保存→自动同步→写时间→再触发同步」会无限递归上传）
             _settings.WebDav.LastSyncTime = DateTime.UtcNow.ToString("o");
-            _config.SaveSettings(_settings);
+            _config.SaveSettings(_settings, raiseEvent: false);
 
             return new WebDavResult { Ok = true, Message = "配置已成功上传到 WebDAV 服务器" };
         }
@@ -294,9 +295,9 @@ public class WebDavService : IWebDavService
             if (!ok)
                 return new WebDavResult { Ok = false, Message = importMsg };
 
-            // 5. 记录同步时间
+            // 5. 记录同步时间（同上传：全覆盖写盘 + 不触发递归同步）
             _settings.WebDav.LastSyncTime = DateTime.UtcNow.ToString("o");
-            _config.SaveSettings(_settings);
+            _config.SaveSettings(_settings, raiseEvent: false);
 
             return new WebDavResult { Ok = true, Message = "远程配置已成功拉取并应用" };
         }

@@ -49,6 +49,19 @@ public partial class MainWindow : FluentWindow
     /// <summary>正在切换平台标志：防止 RefreshPlatforms 重建时 SelectedPlatform 变化递归触发死循环</summary>
     private bool _isSwitching;
 
+    /// <summary>是否处于摸鱼模式（无边框小窗）</summary>
+    private bool _isMiniMode;
+
+    /// <summary>摸鱼模式自己的置顶状态（与主窗口 📌 独立，互不覆盖）</summary>
+    private bool _isMiniPinned;
+
+    /// <summary>进入摸鱼模式时的窗口快照，退出时逐项还原</summary>
+    private MiniSnapshot? _miniSnapshot;
+
+    /// <summary>摸鱼模式保留的缩放热区厚度（DIP）：WebView2 会吞掉鼠标消息，
+    /// 必须靠"窗口自身的这几像素空隙"命中 WM_NCHITTEST 才能拖拽缩放</summary>
+    private const double MiniResizeEdge = 6;
+
     /// <summary>窗口宽度低于此阈值自动折叠侧栏，高于则自动展开（仅记录自动状态，避免反复覆盖手动操作）</summary>
     private const double SidebarAutoCollapseWidth = 560;
 
@@ -77,6 +90,9 @@ public partial class MainWindow : FluentWindow
         _trayService = trayService;
         _config = config;
         _settings = _config.LoadSettings();
+        // 一次性迁移旧默认热键。必须放在订阅 SettingsSaved 之前：
+        // 迁移内部会保存配置并触发 SettingsSaved，否则会递归回到 RegisterHotkey
+        MigrateLegacyHotkeys();
         DataContext = vm;
 
         _copyTimer.Tick += (_, _) => ResetCopyButton();
@@ -88,14 +104,16 @@ public partial class MainWindow : FluentWindow
         _trayService.ExitRequested += (_, _) => ExitApp();
         _platformService.PlatformsChanged += (_, _) => _vm.RefreshPlatforms();
 
-        // 设置保存后（热键/窗口行为等）重新加载并重注册热键
+        // 设置保存后（热键/外观/窗口行为等）重新加载、重注册热键并刷新按钮显隐
         _config.SettingsSaved += (_, _) =>
         {
             _settings = _config.LoadSettings();
             RegisterHotkey();
+            ApplyButtonVisibility();
         };
 
         ApplySavedWindowState();
+        ApplyButtonVisibility();
         SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
     }
@@ -176,6 +194,57 @@ public partial class MainWindow : FluentWindow
         return IntPtr.Zero;
     }
 
+    /// <summary>旧版默认热键一次性迁移：早期版本 Alt+←/→ 是「切换平台」，
+    /// 现在改为「网页后退/前进」，平台切换让位到 Alt+↑/↓。
+    /// 只在用户从未自定义过这两项（仍等于旧默认值）且还没有后退配置时才改写，改完立即落盘；
+    /// 之后一律以用户配置为准（想换回切平台可在设置页重新录制）</summary>
+    private void MigrateLegacyHotkeys()
+    {
+        try
+        {
+            var list = _settings.Hotkeys;
+            if (list is null || list.Count == 0)
+                return;
+
+            // 永久下线「打开设置」快捷键：清理旧配置残留的 ToggleSettings 绑定（幂等，删完立即落盘）
+            if (list.RemoveAll(h => h.Action == HotkeyAction.ToggleSettings) > 0)
+            {
+                _config.SaveSettings(_settings);
+                LoggerHelper.Info("已移除「打开设置」快捷键绑定：新版不再提供该热键");
+            }
+            // 以 WebForward 是否已存在作为"是否已迁移"的判据：
+            // 上一版虽然已有 WebBack(Alt+Z)，但还没有 WebForward，也必须走迁移
+            if (list.Any(h => h.Action == HotkeyAction.WebForward))
+                return;
+
+            static bool Is(HotkeyBinding b, string mod, string key) =>
+                string.Equals((b.Modifier ?? "").Trim(), mod, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals((b.Key ?? "").Trim(), key, StringComparison.OrdinalIgnoreCase);
+
+            var prev = list.FirstOrDefault(h => h.Action == HotkeyAction.PrevPlatform);
+            var next = list.FirstOrDefault(h => h.Action == HotkeyAction.NextPlatform);
+
+            // 任何一项被用户改过，就认为他有自己的键位安排，该项保持不动
+            if (prev is not null && !Is(prev, "Alt", "Left")) prev = null;
+            if (next is not null && !Is(next, "Alt", "Right")) next = null;
+
+            if (prev is not null) { prev.Modifier = "Alt"; prev.Key = "Up"; }
+            if (next is not null) { next.Modifier = "Alt"; next.Key = "Down"; }
+
+            // 清掉旧版本的 WebBack（曾是 Alt+Z），改为方向键方案
+            list.RemoveAll(h => h.Action is HotkeyAction.WebBack or HotkeyAction.WebForward);
+            list.Add(new HotkeyBinding { Action = HotkeyAction.WebBack, Modifier = "Alt", Key = "Left" });
+            list.Add(new HotkeyBinding { Action = HotkeyAction.WebForward, Modifier = "Alt", Key = "Right" });
+
+            _config.SaveSettings(_settings);
+            LoggerHelper.Info("旧默认热键已迁移：Alt+←/→ 改为网页后退/前进，切换平台改为 Alt+↑/↓");
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Error("热键迁移失败（不影响启动，可在设置页手动调整）", ex);
+        }
+    }
+
     /// <summary>注册所有全局热键（按 Action 注册多个），失败仅记录日志，绝不弹窗
     /// 在 OnLoaded 期间弹 MessageBox 会阻塞消息循环导致界面出不来</summary>
     private void RegisterHotkey()
@@ -195,9 +264,11 @@ public partial class MainWindow : FluentWindow
                 [HotkeyAction.ToggleWindow] = new() { Action = HotkeyAction.ToggleWindow, Modifier = "Alt", Key = "Q" },
                 [HotkeyAction.ToggleSidebar] = new() { Action = HotkeyAction.ToggleSidebar, Modifier = "Alt", Key = "E" },
                 [HotkeyAction.ToggleSize] = new() { Action = HotkeyAction.ToggleSize, Modifier = "Alt", Key = "W" },
-                [HotkeyAction.ToggleSettings] = new() { Action = HotkeyAction.ToggleSettings, Modifier = "Alt", Key = "S" },
-                [HotkeyAction.PrevPlatform] = new() { Action = HotkeyAction.PrevPlatform, Modifier = "Alt", Key = "Left" },
-                [HotkeyAction.NextPlatform] = new() { Action = HotkeyAction.NextPlatform, Modifier = "Alt", Key = "Right" },
+                [HotkeyAction.WebBack] = new() { Action = HotkeyAction.WebBack, Modifier = "Alt", Key = "Left" },
+                [HotkeyAction.WebForward] = new() { Action = HotkeyAction.WebForward, Modifier = "Alt", Key = "Right" },
+                [HotkeyAction.PrevPlatform] = new() { Action = HotkeyAction.PrevPlatform, Modifier = "Alt", Key = "Up" },
+                [HotkeyAction.NextPlatform] = new() { Action = HotkeyAction.NextPlatform, Modifier = "Alt", Key = "Down" },
+                [HotkeyAction.ToggleMiniOrientation] = new() { Action = HotkeyAction.ToggleMiniOrientation, Modifier = "Alt", Key = "R" },
             };
             if (_settings.Hotkeys != null)
             {
@@ -260,13 +331,6 @@ public partial class MainWindow : FluentWindow
                 if (!IsActive) return;
                 ToggleCompact_Click(null!, null!);
                 break;
-            // 打开/关闭设置：仅当本软件（主窗口）可见，或设置窗口已打开时响应；
-            // 主窗口隐藏到托盘时不触发，避免关掉主界面后还能调出设置
-            case HotkeyAction.ToggleSettings:
-                if (!this.IsVisible && !_vm.IsSettingsWindowOpen)
-                    return;
-                ((System.Windows.Input.ICommand)_vm.OpenSettingsCommand).Execute(null);
-                break;
             case HotkeyAction.PrevPlatform:
                 if (!IsActive) return;
                 _vm.SelectPrevPlatform();
@@ -274,6 +338,22 @@ public partial class MainWindow : FluentWindow
             case HotkeyAction.NextPlatform:
                 if (!IsActive) return;
                 _vm.SelectNextPlatform();
+                break;
+
+            // 摸鱼模式横竖屏切换：仅在小窗内有效
+            case HotkeyAction.ToggleMiniOrientation:
+                if (!_isMiniMode) return;
+                ToggleMiniOrientation();
+                break;
+
+            // 网页后退 / 前进：小窗里从视频页返回列表最常用（不占屏幕，靠热键实现）
+            case HotkeyAction.WebBack:
+                if (!IsActive) return;
+                GoBackCurrent();
+                break;
+            case HotkeyAction.WebForward:
+                if (!IsActive) return;
+                GoForwardCurrent();
                 break;
         }
     }
@@ -306,14 +386,24 @@ public partial class MainWindow : FluentWindow
 
             if (!_hosts.TryGetValue(item.Id, out var host))
             {
-                host = new WebViewHost(item.Info, _webViewService, _iconService, _platformService, _config);
+                host = new WebViewHost(item.Info, _webViewService, _iconService, _platformService);
                 host.AddressChanged += OnHostAddressChanged;
                 _hosts[item.Id] = host;
                 WebViewContainer.Children.Add(host);
             }
 
             host.Visibility = Visibility.Visible;
+            // 摸鱼模式下切进来的实例（含刚懒加载创建的）同样要最小缩放。
+            // 必须在 EnsureInitializedAsync 之前设置：WebView2 尚未创建时先记下请求，初始化后补应用
+            if (_isMiniMode)
+                host.ApplyMiniZoom();
+            // Esc 订阅常开：大窗按 Esc 进入摸鱼、小窗按 Esc 退出（网页全屏时钩子不上报，不抢原生全屏键）
+            SyncEscapeSubscription(host);
             await host.EnsureInitializedAsync();
+
+            // 切回该平台（实例是复用的、不会重新加载）时重压一遍设置页里的缩放，
+            // 保证"配置值是强制值"：之前在页面里临时缩放过的，切回来就恢复成配置值
+            host.ApplyConfiguredZoom();
 
             // 切换平台后主动同步地址栏为当前实例的实际网址：已初始化实例不会重新导航，
             // 不会再触发 NavigationCompleted，必须在这里更新，否则会显示上一个平台的旧链接
@@ -373,7 +463,7 @@ public partial class MainWindow : FluentWindow
         // Topmost 闪烁：确保窗口跳到所有窗口最前面（解决被其他窗口遮挡"闪一下消失"的问题）
         Topmost = true;
         Topmost = false;
-        Topmost = _isPinned; // 恢复用户置顶状态，不被临时闪烁覆盖
+        Topmost = _isMiniMode ? _isMiniPinned : _isPinned; // 恢复置顶状态（摸鱼小窗用自己的置顶开关）
 
         // 短暂等待页面响应后注入聚焦脚本（失败不阻塞，可手动点击）
         try
@@ -395,6 +485,26 @@ public partial class MainWindow : FluentWindow
             _hosts.TryGetValue(_vm.SelectedPlatform.Id, out var host))
         {
             host.Reload();
+        }
+    }
+
+    /// <summary>当前平台网页后退一层（浏览器历史记录）；无可后退项则静默忽略</summary>
+    private void GoBackCurrent()
+    {
+        if (_vm.SelectedPlatform is not null &&
+            _hosts.TryGetValue(_vm.SelectedPlatform.Id, out var host))
+        {
+            host.GoBack();
+        }
+    }
+
+    /// <summary>当前平台网页前进一层（浏览器历史记录）；无可前进项则静默忽略</summary>
+    private void GoForwardCurrent()
+    {
+        if (_vm.SelectedPlatform is not null &&
+            _hosts.TryGetValue(_vm.SelectedPlatform.Id, out var host))
+        {
+            host.GoForward();
         }
     }
 
@@ -426,6 +536,10 @@ public partial class MainWindow : FluentWindow
     /// <summary>响应式布局：窗口尺寸变化时同步保存窗口状态</summary>
     private void MainWindow_OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
+        // 摸鱼小窗本身就是小尺寸：若走自动折叠逻辑会把侧栏标记改掉，退出后就还原不回原状态
+        if (_isMiniMode)
+            return;
+
         // 缩放窗口到一定宽度时自动折叠/展开侧栏：宽度不足阈值则合上，恢复则展开
         if (e.PreviousSize.Width == 0)
             return; // 初次布局不处理
@@ -585,6 +699,21 @@ public partial class MainWindow : FluentWindow
     private void SaveWindowState()
     {
         var win = _settings.Window;
+
+        // 摸鱼模式下窗口处于小窗尺寸：不能把它当成主窗口尺寸写进记忆，
+        // 只记小窗自己的位置与朝向，主窗口的尺寸/位置保持上次退出摸鱼时的值
+        if (_isMiniMode)
+        {
+            if (WindowState == WindowState.Normal)
+            {
+                win.MiniLeft = Left;
+                win.MiniTop = Top;
+            }
+            win.MiniTopmost = _isMiniPinned;
+            _config.SaveSettings(_settings);
+            return;
+        }
+
         if (WindowState == WindowState.Normal)
         {
             win.Left = Left;
@@ -604,13 +733,330 @@ public partial class MainWindow : FluentWindow
         Application.Current.Shutdown();
     }
 
+    /// <summary>按设置应用主界面导航条按钮显隐（外观设置页可配置）。
+    /// 用 Collapsed 而非 Hidden：隐藏的按钮不占位，其余按钮左移补齐</summary>
+    private void ApplyButtonVisibility()
+    {
+        try
+        {
+            var ui = _settings.Ui;
+            if (CopyUrlButton != null) CopyUrlButton.Visibility = ui.ShowCopyUrl ? Visibility.Visible : Visibility.Collapsed;
+            if (HomeButton != null) HomeButton.Visibility = ui.ShowHome ? Visibility.Visible : Visibility.Collapsed;
+            if (CompactToggleButton != null) CompactToggleButton.Visibility = ui.ShowCompactToggle ? Visibility.Visible : Visibility.Collapsed;
+            if (ReloadButton != null) ReloadButton.Visibility = ui.ShowReload ? Visibility.Visible : Visibility.Collapsed;
+            if (ThemeToggleButton != null) ThemeToggleButton.Visibility = ui.ShowThemeToggle ? Visibility.Visible : Visibility.Collapsed;
+            if (PinToggleButton != null) PinToggleButton.Visibility = ui.ShowPinToggle ? Visibility.Visible : Visibility.Collapsed;
+            if (MiniModeButton != null) MiniModeButton.Visibility = ui.ShowMiniMode ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Error("应用按钮显隐设置失败（保持默认显示）", ex);
+        }
+    }
+
+    #region 摸鱼模式（无边框小窗）
+
+    /// <summary>进入摸鱼模式前的窗口状态快照，退出时逐项还原</summary>
+    private sealed class MiniSnapshot
+    {
+        public double Width, Height, Left, Top, MinWidth, MinHeight;
+        public Thickness BorderThickness, WebViewMargin;
+        public bool SidebarCollapsed, MainPinned;
+        public WindowState State;
+    }
+
+    /// <summary>摸鱼模式开关（导航条 🐟 按钮）</summary>
+    private void MiniMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isMiniMode) ExitMiniMode();
+        else EnterMiniMode();
+    }
+
+    /// <summary>进入摸鱼模式：隐藏标题栏/侧栏/导航条并缩成无边框小窗。
+    /// 关键点是"就地变形"而不是新建窗口——WebView2 实例原地保留，
+    /// 正在播放的视频不中断、登录态不丢、全局热键也无需重新注册</summary>
+    private void EnterMiniMode()
+    {
+        if (_isMiniMode) return;
+        try
+        {
+            var win = _settings.Window;
+
+            // 1) 快照：先记下原始窗口状态（最大化要记原值），再归一化为 Normal 便于改尺寸
+            var prevState = WindowState;
+            if (prevState != WindowState.Normal)
+                WindowState = WindowState.Normal;
+            _miniSnapshot = new MiniSnapshot
+            {
+                Width = Width, Height = Height, Left = Left, Top = Top,
+                MinWidth = MinWidth, MinHeight = MinHeight,
+                BorderThickness = BorderThickness,
+                WebViewMargin = WebViewContainer.Margin,
+                SidebarCollapsed = _vm.IsSidebarCollapsed,
+                MainPinned = _isPinned,
+                State = prevState,
+            };
+
+            _isMiniMode = true;
+
+            // 2) 隐藏所有"桌面形态"元素，只留网页（顶部只保留 8px 隐形拖动条，不占观看区域）
+            TitleBar.Visibility = Visibility.Collapsed;
+            SidebarBorder.Visibility = Visibility.Collapsed;
+            NavBarBorder.Visibility = Visibility.Collapsed;
+            MiniTopBar.Visibility = Visibility.Visible;
+            // 左/右/下各留 6px：WebView2 是原生子窗口会吞掉其覆盖区域的鼠标消息，
+            // 只有窗口自身露出的这几像素才能命中 WM_NCHITTEST 完成拖拽缩放（顶部 8px 归拖动带）
+            WebViewContainer.Margin = new Thickness(MiniResizeEdge, 0, MiniResizeEdge, MiniResizeEdge);
+
+            // 3) 去边框：Mica / 圆角关掉，WPF 边框厚度归零，再用 DWM 抹掉 Win11 的 1px 系统描边
+            WindowBackdropType = WindowBackdropType.None;
+            WindowCornerPreference = WindowCornerPreference.DoNotRound;
+            BorderThickness = new Thickness(0);
+            ApplyDwmBorderless(true);
+
+            // 4) 先放宽 Min 约束再改尺寸——顺序反了目标尺寸会被旧 Min 夹断
+            MinWidth = 200;
+            MinHeight = 120;
+            ApplyMiniSize(keepCenter: false);
+
+            // 5) 页面缩放到 WebView2 允许的最小值：CSS 视口被放大到 ~1920px 宽，
+            //    桌面版页面正好铺满小窗，竖版滚动条消失（这是摸鱼观看体验的关键）
+            //    （Esc 订阅已在每个实例创建时挂好，常开，此处无需处理）
+            foreach (var host in _hosts.Values)
+            {
+                host.ApplyMiniZoom();
+            }
+
+            // 6) 摸鱼时默认置顶，免得被工作窗口盖住（想关掉改 settings.json 的 MiniTopmost）
+            _isMiniPinned = win.MiniTopmost;
+            Topmost = _isMiniPinned;
+
+            LoggerHelper.Info($"进入摸鱼模式（{(win.MiniIsPortrait ? "竖屏" : "横屏")} {Width}x{Height}）");
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Error("进入摸鱼模式失败", ex);
+            _isMiniMode = false;
+        }
+    }
+
+    /// <summary>退出摸鱼模式：还原进入前的一切（尺寸/位置/侧栏/置顶/边框/窗口状态），
+    /// 同时记住本次小窗的朝向与位置，下次进入原样恢复</summary>
+    private void ExitMiniMode()
+    {
+        if (!_isMiniMode) return;
+        try
+        {
+            // 记住本次小窗位置与朝向
+            var win = _settings.Window;
+            if (WindowState == WindowState.Normal)
+            {
+                win.MiniLeft = Left;
+                win.MiniTop = Top;
+            }
+            win.MiniTopmost = _isMiniPinned;
+            try { _config.SaveSettings(_settings); }
+            catch (Exception ex) { LoggerHelper.Error("保存摸鱼模式状态失败", ex); }
+
+            _isMiniMode = false;
+
+            // 还原界面元素
+            TitleBar.Visibility = Visibility.Visible;
+            SidebarBorder.Visibility = Visibility.Visible;
+            NavBarBorder.Visibility = Visibility.Visible;
+            MiniTopBar.Visibility = Visibility.Collapsed;
+            WebViewContainer.Margin = _miniSnapshot?.WebViewMargin ?? new Thickness(0, 0, 8, 8);
+
+            // 还原网页缩放（回到平台配置的比例）。Esc 订阅保持常开：大窗按 Esc 还能再次进入摸鱼
+            foreach (var host in _hosts.Values)
+            {
+                host.RestoreZoom();
+            }
+
+            // 还原边框外观
+            WindowBackdropType = WindowBackdropType.Mica;
+            WindowCornerPreference = WindowCornerPreference.Default;
+            BorderThickness = _miniSnapshot?.BorderThickness ?? new Thickness(0);
+            ApplyDwmBorderless(false);
+
+            var snap = _miniSnapshot;
+            if (snap is not null)
+            {
+                // 同样先恢复 Min 约束再恢复尺寸
+                MinWidth = snap.MinWidth;
+                MinHeight = snap.MinHeight;
+                Topmost = snap.MainPinned;
+                Width = snap.Width;
+                Height = snap.Height;
+                Left = snap.Left;
+                Top = snap.Top;
+                _vm.IsSidebarCollapsed = snap.SidebarCollapsed;
+                if (WindowState != snap.State)
+                    WindowState = snap.State;
+            }
+            _miniSnapshot = null;
+            _isMiniPinned = false;
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Error("退出摸鱼模式失败", ex);
+        }
+    }
+
+    /// <summary>应用摸鱼小窗尺寸：keepCenter 为 true 时保持窗口中心点不动（横竖屏切换用），
+    /// 否则优先使用上次记忆的小窗位置</summary>
+    private void ApplyMiniSize(bool keepCenter)
+    {
+        var win = _settings.Window;
+        var cx = Left + Width / 2;
+        var cy = Top + Height / 2;
+
+        Width = win.MiniIsPortrait ? win.MiniPortraitWidth : win.MiniLandscapeWidth;
+        Height = win.MiniIsPortrait ? win.MiniPortraitHeight : win.MiniLandscapeHeight;
+
+        if (keepCenter)
+        {
+            Left = cx - Width / 2;
+            Top = cy - Height / 2;
+        }
+        else if (win.MiniLeft is not null && win.MiniTop is not null)
+        {
+            Left = win.MiniLeft.Value;
+            Top = win.MiniTop.Value;
+        }
+
+        // 记忆位置可能落在已拔掉的显示器或改过分辨率的屏幕上，统一夹回可视区
+        ClampToVisibleArea();
+    }
+
+    /// <summary>横竖屏切换（Alt+R）：保持窗口中心点不动，避免跳屏</summary>
+    private void ToggleMiniOrientation()
+    {
+        if (!_isMiniMode) return;
+        try
+        {
+            var win = _settings.Window;
+            win.MiniIsPortrait = !win.MiniIsPortrait;
+            ApplyMiniSize(keepCenter: true);
+            try { _config.SaveSettings(_settings); }
+            catch (Exception ex) { LoggerHelper.Error("保存摸鱼朝向失败", ex); }
+            LoggerHelper.Info($"摸鱼模式切换到{(win.MiniIsPortrait ? "竖屏" : "横屏")} {Width}x{Height}");
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Error("切换摸鱼朝向失败", ex);
+        }
+    }
+
+    /// <summary>把窗口夹回可视区（多屏拔插后记忆位置可能失效）。
+    /// 按"目标矩形所在显示器"取 WorkArea——摸鱼小窗常被丢到副屏，若按窗口当前屏幕约束会被硬拽回主屏</summary>
+    private void ClampToVisibleArea()
+    {
+        try
+        {
+            var area = GetWorkAreaForRect(Left, Top, Width, Height);
+            // Math.Max 兜底：窗口比工作区还大时（如超小副屏）直接对齐左上角，不产生负范围
+            Left = Math.Max(area.Left, Math.Min(Left, Math.Max(area.Left, area.Right - Width)));
+            Top = Math.Max(area.Top, Math.Min(Top, Math.Max(area.Top, area.Bottom - Height)));
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Info($"窗口位置约束失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>取指定矩形（DIP）所在显示器的 WorkArea（DIP）。
+    /// 坐标换算按窗口当前 DPI 近似，取不到显示器时回退到窗口当前所在屏幕</summary>
+    private Rect GetWorkAreaForRect(double left, double top, double width, double height)
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            var dpi = hwnd == IntPtr.Zero ? 96u : GetDpiForWindow(hwnd);
+            if (dpi == 0) dpi = 96;
+            var scale = dpi / 96.0;
+
+            var rc = new RECT
+            {
+                left = (int)Math.Round(left * scale),
+                top = (int)Math.Round(top * scale),
+                right = (int)Math.Round((left + width) * scale),
+                bottom = (int)Math.Round((top + height) * scale),
+            };
+            var mon = MonitorFromRect(ref rc, MONITOR_DEFAULTTONEAREST);
+            if (mon != IntPtr.Zero)
+            {
+                var info = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
+                if (GetMonitorInfo(mon, ref info))
+                {
+                    var wa = info.rcWork;
+                    return new Rect(wa.left / scale, wa.top / scale,
+                        (wa.right - wa.left) / scale, (wa.bottom - wa.top) / scale);
+                }
+            }
+        }
+        catch { /* 回退到当前屏幕 */ }
+        return GetCurrentMonitorWorkArea();
+    }
+
+    /// <summary>顶部热区：按住拖动整窗；右键退出摸鱼模式（双击太容易在拖动时误触，弃用）。
+    /// WebView2 会吞掉其覆盖区域的鼠标消息，整窗拖动只能在它上方这条 8px 热区上做</summary>
+    private void MiniDragStrip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isMiniMode) return;
+
+        try { DragMove(); }
+        catch (Exception ex) { LoggerHelper.Info($"拖动小窗失败: {ex.Message}"); }
+    }
+
+    /// <summary>拖动条右键：退出摸鱼模式（鼠标不用离开视频区域，也不会与拖动冲突）</summary>
+    private void MiniDragStrip_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isMiniMode) return;
+        e.Handled = true;
+        ExitMiniMode();
+    }
+
+    /// <summary>窗口级 Esc：摸鱼模式进出总开关（大窗进入 / 小窗退出）。
+    /// 焦点不在网页里时（如点了拖动条、导航条）由这里兜底；网页内的 Esc 由 WebViewHost 的 JS 钩子上报</summary>
+    private void MainWindow_OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape) return;
+        e.Handled = true;
+        if (_isMiniMode) ExitMiniMode();
+        else EnterMiniMode();
+    }
+
+    /// <summary>网页内按 Esc 的回调（来自 WebViewHost JS 钩子上报）：大窗进入摸鱼、小窗退出摸鱼</summary>
+    private void OnEscapeRequested()
+    {
+        if (_isMiniMode) ExitMiniMode();
+        else EnterMiniMode();
+    }
+
+    /// <summary>订阅某个 WebViewHost 的 Esc 上报（幂等）。订阅常开：
+    /// 大窗按 Esc 进入摸鱼、小窗按 Esc 退出；网页全屏时 JS 钩子不上报，不抢网页全屏的退出键</summary>
+    private void SyncEscapeSubscription(WebViewHost host)
+    {
+        host.EscapePressed -= OnEscapeRequested;
+        host.EscapePressed += OnEscapeRequested;
+    }
+
+    #endregion 摸鱼模式（无边框小窗）
+
     #region 顶部边缘缩放（子类化窗口过程）
 
     /// <summary>非客户区命中测试消息</summary>
     private const int WmNcHitTest = 0x0084;
 
-    /// <summary>命中结果常量：顶边 / 左上角 / 右上角</summary>
-    private const int HtTop = 12, HtTopLeft = 13, HtTopRight = 14;
+    /// <summary>命中结果常量：客户区 / 左边 / 右边 / 顶边 / 左上角 / 右上角 / 底边 / 左下角 / 右下角</summary>
+    private const int HtClient = 1, HtLeft = 10, HtRight = 11, HtTop = 12,
+        HtTopLeft = 13, HtTopRight = 14, HtBottom = 15, HtBottomLeft = 16, HtBottomRight = 17;
+
+    /// <summary>DWM 窗口边框颜色属性与其特殊取值（用于抹掉 Win11 的 1px 系统描边）</summary>
+    private const int DwmwaBorderColor = 34;
+    private const uint DwmwaColorNone = 0xFFFFFFFE;
+    private const uint DwmwaColorDefault = 0xFFFFFFFF;
 
     /// <summary>窗口过程替换索引</summary>
     private const int GwlWndProc = -4;
@@ -633,6 +1079,39 @@ public partial class MainWindow : FluentWindow
     /// 此处在更早的层面拦截 WM_NCHITTEST，顶边 8px 返回 HTTOP 系列恢复上下缩放</summary>
     private IntPtr SubclassWndProc(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam)
     {
+        // 摸鱼小窗：系统边框已全部去掉，缩放热区只能由这里手工提供。
+        // 左/右/下边与三个角返回缩放命中；顶部中间必须返回 HTCLIENT——
+        // 那块 8px 是 WPF 的拖动带，要留给它接收鼠标才能拖动整个无边框窗口
+        if (msg == WmNcHitTest && _isMiniMode && WindowState == WindowState.Normal)
+        {
+            try
+            {
+                if (GetWindowRect(hWnd, out var mrc))
+                {
+                    var edge = (int)Math.Ceiling(MiniResizeEdge * GetDpiForWindow(hWnd) / 96.0);
+                    var w = mrc.right - mrc.left;
+                    var h = mrc.bottom - mrc.top;
+                    var x = (short)(lParam.ToInt64() & 0xFFFF) - mrc.left;
+                    var y = (short)((lParam.ToInt64() >> 16) & 0xFFFF) - mrc.top;
+                    var atLeft = x <= edge;
+                    var atRight = x >= w - edge;
+                    var atTop = y <= edge;
+                    var atBottom = y >= h - edge;
+
+                    if (atTop && atLeft) return (IntPtr)HtTopLeft;
+                    if (atTop && atRight) return (IntPtr)HtTopRight;
+                    if (atBottom && atLeft) return (IntPtr)HtBottomLeft;
+                    if (atBottom && atRight) return (IntPtr)HtBottomRight;
+                    if (atLeft) return (IntPtr)HtLeft;
+                    if (atRight) return (IntPtr)HtRight;
+                    if (atBottom) return (IntPtr)HtBottom;
+                    if (atTop) return (IntPtr)HtClient; // 顶部中间 = 拖动带，交回 WPF 处理
+                }
+            }
+            catch { /* 异常时回落到默认处理 */ }
+            return CallWindowProc(_oldWndProc, hWnd, msg, wParam, lParam);
+        }
+
         if (msg == WmNcHitTest && WindowState == WindowState.Normal && ResizeMode != ResizeMode.NoResize)
         {
             try
@@ -678,6 +1157,26 @@ public partial class MainWindow : FluentWindow
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
 
+    /// <summary>开关 DWM 绘制的窗口描边：Win11 上即使 BackdropType=None 仍会留 1px 浅色边框，
+    /// 摸鱼小窗靠它做到真正无边框；Win10 不支持该属性，调用失败直接忽略（回退到默认外观）</summary>
+    private void ApplyDwmBorderless(bool borderless)
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return;
+            var color = borderless ? DwmwaColorNone : DwmwaColorDefault;
+            _ = DwmSetWindowAttribute(hwnd, DwmwaBorderColor, ref color, sizeof(uint));
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Info($"设置 DWM 边框颜色失败: {ex.Message}");
+        }
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref uint value, int size);
+
     #endregion
 
     #region 多屏定位辅助
@@ -708,6 +1207,9 @@ public partial class MainWindow : FluentWindow
 
     [DllImport("user32.dll")]
     private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromRect(ref RECT lprc, uint dwFlags);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);

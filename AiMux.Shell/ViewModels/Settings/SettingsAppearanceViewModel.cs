@@ -30,6 +30,28 @@ public class SettingsAppearanceViewModel : BindableBase
         set => SetProperty(ref _isDark, value);
     }
 
+    // ===== 主界面按钮显隐（导航条 7 个按钮，取消勾选即隐藏）=====
+    private bool _showCopyUrl;
+    public bool ShowCopyUrl { get => _showCopyUrl; set => SetProperty(ref _showCopyUrl, value); }
+
+    private bool _showHome;
+    public bool ShowHome { get => _showHome; set => SetProperty(ref _showHome, value); }
+
+    private bool _showCompactToggle;
+    public bool ShowCompactToggle { get => _showCompactToggle; set => SetProperty(ref _showCompactToggle, value); }
+
+    private bool _showReload;
+    public bool ShowReload { get => _showReload; set => SetProperty(ref _showReload, value); }
+
+    private bool _showThemeToggle;
+    public bool ShowThemeToggle { get => _showThemeToggle; set => SetProperty(ref _showThemeToggle, value); }
+
+    private bool _showPinToggle;
+    public bool ShowPinToggle { get => _showPinToggle; set => SetProperty(ref _showPinToggle, value); }
+
+    private bool _showMiniMode;
+    public bool ShowMiniMode { get => _showMiniMode; set => SetProperty(ref _showMiniMode, value); }
+
     public DelegateCommand SaveCommand { get; }
 
     public SettingsAppearanceViewModel(ConfigService config)
@@ -38,14 +60,30 @@ public class SettingsAppearanceViewModel : BindableBase
         _settings = config.LoadSettings();
         _isLight = _settings.Theme != "Dark";
         _isDark = !_isLight;
+        var ui = _settings.Ui;
+        _showCopyUrl = ui.ShowCopyUrl;
+        _showHome = ui.ShowHome;
+        _showCompactToggle = ui.ShowCompactToggle;
+        _showReload = ui.ShowReload;
+        _showThemeToggle = ui.ShowThemeToggle;
+        _showPinToggle = ui.ShowPinToggle;
+        _showMiniMode = ui.ShowMiniMode;
         SaveCommand = new DelegateCommand(Save);
     }
 
-    /// <summary>应用并保存主题</summary>
+    /// <summary>应用并保存主题与按钮显隐</summary>
     private void Save()
     {
         var theme = IsDark ? "Dark" : "Light";
         _settings.Theme = theme;
+        var ui = _settings.Ui;
+        ui.ShowCopyUrl = ShowCopyUrl;
+        ui.ShowHome = ShowHome;
+        ui.ShowCompactToggle = ShowCompactToggle;
+        ui.ShowReload = ShowReload;
+        ui.ShowThemeToggle = ShowThemeToggle;
+        ui.ShowPinToggle = ShowPinToggle;
+        ui.ShowMiniMode = ShowMiniMode;
         _config.SaveSettings(_settings);
         ApplyTheme(theme);
     }

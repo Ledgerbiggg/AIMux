@@ -10,10 +10,20 @@ public class AppSettings
         new() { Action = HotkeyAction.ToggleWindow, Modifier = "Alt", Key = "Q" },
         new() { Action = HotkeyAction.ToggleSidebar, Modifier = "Alt", Key = "E" },
         new() { Action = HotkeyAction.ToggleSize, Modifier = "Alt", Key = "W" },
-        new() { Action = HotkeyAction.ToggleSettings, Modifier = "Alt", Key = "S" },
-        new() { Action = HotkeyAction.PrevPlatform, Modifier = "Alt", Key = "Left" },
-        new() { Action = HotkeyAction.NextPlatform, Modifier = "Alt", Key = "Right" },
+        // 「打开设置」不设热键（永久下线）：设置走主界面按钮，把 Alt+S 让给将来的功能键
+        // Alt+←/→ 给「网页后退/前进」——摸鱼看视频时从播放页返回列表全靠它，比切平台常用得多
+        new() { Action = HotkeyAction.WebBack, Modifier = "Alt", Key = "Left" },
+        new() { Action = HotkeyAction.WebForward, Modifier = "Alt", Key = "Right" },
+        // 切换平台因此让位到 Alt+↑/↓
+        new() { Action = HotkeyAction.PrevPlatform, Modifier = "Alt", Key = "Up" },
+        new() { Action = HotkeyAction.NextPlatform, Modifier = "Alt", Key = "Down" },
+        // 进入/退出摸鱼模式刻意不给热键：统一走 Esc（大窗按进入、小窗按退出，同一个键不会记错）。
+        // 横竖屏切换必须保留热键——小窗里没有任何按钮，只能靠键盘切
+        new() { Action = HotkeyAction.ToggleMiniOrientation, Modifier = "Alt", Key = "R" },
     ];
+
+    /// <summary>界面显示设置（主界面按钮可见性等）</summary>
+    public UiSettings Ui { get; set; } = new();
 
     /// <summary>窗口尺寸与位置记忆</summary>
     public WindowSettings Window { get; set; } = new();
@@ -29,6 +39,32 @@ public class AppSettings
 
     /// <summary>构造函数：不填充任何默认热键，全部由用户自行设置</summary>
     public AppSettings() { }
+}
+
+/// <summary>界面显示设置：主界面导航条按钮的可见性（外观设置页可配置）。
+/// 全部默认显示，用户可取消勾选隐藏不用的按钮，让导航条更清爽</summary>
+public class UiSettings
+{
+    /// <summary>复制链接按钮（📋）</summary>
+    public bool ShowCopyUrl { get; set; } = true;
+
+    /// <summary>回到平台主页按钮（🏠）</summary>
+    public bool ShowHome { get; set; } = true;
+
+    /// <summary>大窗/小窗切换按钮（↗）</summary>
+    public bool ShowCompactToggle { get; set; } = true;
+
+    /// <summary>刷新网页按钮（↻）</summary>
+    public bool ShowReload { get; set; } = true;
+
+    /// <summary>主题切换按钮（🌙/☀）</summary>
+    public bool ShowThemeToggle { get; set; } = true;
+
+    /// <summary>置顶窗口按钮（📌）</summary>
+    public bool ShowPinToggle { get; set; } = true;
+
+    /// <summary>摸鱼模式按钮（🐟）</summary>
+    public bool ShowMiniMode { get; set; } = true;
 }
 
 /// <summary>WebDAV 配置同步设置：通过 WebDAV 服务器统一管理多设备配置</summary>
@@ -63,26 +99,41 @@ public class HotkeyBinding
     public string Key { get; set; } = "";
 }
 
-/// <summary>热键动作类型：窗口呼出/隐藏、侧边栏折叠、平台前后切换</summary>
+/// <summary>热键动作类型：窗口呼出/隐藏、侧边栏折叠、平台前后切换、网页导航
+/// 注意：本枚举以数字形式持久化在 settings.json 中，**只能往后追加，
+/// 绝不能删除成员或调整顺序**，否则旧配置里的数字会静默指向错误的动作</summary>
 public enum HotkeyAction
 {
     /// <summary>显示/隐藏主窗口</summary>
-    ToggleWindow,
+    ToggleWindow = 0,
 
     /// <summary>展开/折叠侧边栏</summary>
-    ToggleSidebar,
+    ToggleSidebar = 1,
 
     /// <summary>切换小窗/大窗尺寸</summary>
-    ToggleSize,
+    ToggleSize = 2,
 
     /// <summary>打开/关闭设置（操作）窗口</summary>
-    ToggleSettings,
+    ToggleSettings = 3,
 
     /// <summary>切换到上一个平台（循环，首项跳到末项）</summary>
-    PrevPlatform,
+    PrevPlatform = 4,
 
     /// <summary>切换到下一个平台（循环，末项跳到首项）</summary>
-    NextPlatform,
+    NextPlatform = 5,
+
+    /// <summary>已停用：摸鱼模式进出改为 Esc 统一切换（同键双态，不占用可配置热键）。
+    /// 保留成员只为兼容旧配置里的数字，不再注册也不再出现在设置页</summary>
+    ToggleMiniMode = 6,
+
+    /// <summary>摸鱼模式内切换横屏 / 竖屏朝向</summary>
+    ToggleMiniOrientation = 7,
+
+    /// <summary>网页后退（浏览器历史记录回退一层，摸鱼看视频返回列表最常用）</summary>
+    WebBack = 8,
+
+    /// <summary>网页前进（浏览器历史记录前进一层）</summary>
+    WebForward = 9,
 }
 
 /// <summary>窗口尺寸与位置记忆</summary>
@@ -114,6 +165,32 @@ public class WindowSettings
 
     /// <summary>侧边栏是否折叠（独立记忆，不随窗口大小变化；默认折叠）</summary>
     public bool SidebarCollapsed { get; set; } = true;
+
+    // ===== 摸鱼模式（无边框小窗）=====
+
+    /// <summary>摸鱼模式-横屏宽（16:9，看视频用；默认在原 480 基础上缩小约 1/4）</summary>
+    public double MiniLandscapeWidth { get; set; } = 360;
+
+    /// <summary>摸鱼模式-横屏高</summary>
+    public double MiniLandscapeHeight { get; set; } = 200;
+
+    /// <summary>摸鱼模式-竖屏宽（9:16，看竖版短视频用；默认约为原 320 的 2/3）</summary>
+    public double MiniPortraitWidth { get; set; } = 215;
+
+    /// <summary>摸鱼模式-竖屏高</summary>
+    public double MiniPortraitHeight { get; set; } = 284;
+
+    /// <summary>摸鱼模式上次朝向：true = 竖屏，false = 横屏</summary>
+    public bool MiniIsPortrait { get; set; }
+
+    /// <summary>摸鱼模式小窗左坐标（独立记忆，不污染主窗口位置）</summary>
+    public double? MiniLeft { get; set; }
+
+    /// <summary>摸鱼模式小窗上坐标（独立记忆）</summary>
+    public double? MiniTop { get; set; }
+
+    /// <summary>摸鱼模式是否置顶（默认置顶：摸鱼时不被其他窗口盖住）</summary>
+    public bool MiniTopmost { get; set; } = true;
 }
 
 /// <summary>运行行为设置</summary>
