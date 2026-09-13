@@ -1,5 +1,5 @@
 ---
-description: 发布新版本：升级版本号 + 整理上次发版到当前的全部提交 + 写入 version.json 更新清单 + 提交并推送到远端。push 后 GitHub 工作流会自动据此生成 Release 说明。
+description: 提交并发布版本：升级版本号 + 整理上次发版到当前的全部提交 + 写入 version.json 更新清单 + 提交并推送到远端。push 后 GitHub 工作流会自动据此生成 Release 说明。当用户说"提交并发布版本"、"发布版本"、"发版"时使用。
 argument-hint: "[patch|minor|major]  默认 patch"
 ---
 
@@ -60,7 +60,7 @@ git commit -m "release: bump to <NEW_VER>"
 ```
 （提交信息此英文格式，便于第 3 步的 `--grep` 能再次定位到本次为「上一次发版」）
 
-### 6. 先拉取再推送（与 /push-changes 相同，只是多了上面升版本+写清单这两步）
+### 6. 先拉取再推送（与 /push-only 相同，只是多了上面升版本+写清单这两步）
 4. **先拉取（避免覆盖他人改动 / 解决分叉）**：
    ```
    git pull --ff-only
