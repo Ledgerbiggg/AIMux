@@ -35,8 +35,6 @@
                                 VerticalContentAlignment="Center"
                                 PasswordChar="*"
                                 PasswordChanged="OnPasswordChanged" />
-
-                <CheckBox Content="保存设置时自动上传到 WebDAV" IsChecked="{Binding AutoSync}" Margin="0,14,0,0" />
             </StackPanel>
 
             <!-- 操作按钮 -->

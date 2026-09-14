@@ -1,6 +1,7 @@
 using System.Windows;
 using AiMux.Common.Config;
 using AiMux.Models;
+using AiMux.Shell.Util;
 using Prism.Commands;
 using Prism.Mvvm;
 using Wpf.Ui.Appearance;
@@ -86,6 +87,8 @@ public class SettingsAppearanceViewModel : BindableBase
         ui.ShowMiniMode = ShowMiniMode;
         _config.SaveSettings(_settings);
         ApplyTheme(theme);
+        // 与通用/热键页对齐：给出明确反馈，否则按钮显隐无变化时体感是"点了没反应"
+        _ = MessageBoxHelper.Info("外观设置已应用。");
     }
 
     /// <summary>应用 WPF-UI 主题：所有引用 WPF-UI DynamicResource 的控件自动跟随

@@ -14,7 +14,7 @@
             <!-- 主界面按钮显隐：取消勾选即隐藏对应按钮，让导航条更清爽 -->
             <TextBlock Style="{StaticResource FormLabelStyle}" Text="主界面按钮" Margin="0,26,0,0" />
             <TextBlock Style="{StaticResource FormHelpStyle}" Margin="0,2,0,4"
-                       Text="取消勾选可隐藏顶部导航条上的对应按钮（下次保存后生效）" />
+                       Text="取消勾选可隐藏顶部导航条上的对应按钮，点「应用」立即生效" />
             <CheckBox Content="复制链接（📋）" IsChecked="{Binding ShowCopyUrl}" />
             <CheckBox Content="回到主页（🏠）" IsChecked="{Binding ShowHome}" />
             <CheckBox Content="放大/缩小窗口（↗）" IsChecked="{Binding ShowCompactToggle}" />

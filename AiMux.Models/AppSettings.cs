@@ -79,9 +79,6 @@ public class WebDavSettings
     /// <summary>密码（Basic 认证）</summary>
     public string Password { get; set; } = "";
 
-    /// <summary>是否在保存设置时自动上传到 WebDAV</summary>
-    public bool AutoSync { get; set; } = false;
-
     /// <summary>上次同步时间（UTC ISO 8601），从未同步为空</summary>
     public string LastSyncTime { get; set; } = "";
 }

@@ -37,13 +37,6 @@ public class SettingsSyncViewModel : BindableBase
         set => SetProperty(ref _password, value);
     }
 
-    private bool _autoSync;
-    public bool AutoSync
-    {
-        get => _autoSync;
-        set => SetProperty(ref _autoSync, value);
-    }
-
     /// <summary>是否正在执行操作（禁用按钮/显示进度）</summary>
     public bool IsBusy
     {
@@ -85,17 +78,19 @@ public class SettingsSyncViewModel : BindableBase
     public DelegateCommand ImportCommand { get; }
 
     private readonly IWebDavService _webDavService;
+    private readonly IPlatformService _platformService;
 
-    public SettingsSyncViewModel(ConfigService config, IWebDavService webDavService)
+    public SettingsSyncViewModel(ConfigService config, IWebDavService webDavService,
+        IPlatformService platformService)
     {
         _config = config;
         _settings = config.LoadSettings();
         _webDavService = webDavService;
+        _platformService = platformService;
 
         ServerUrl = _settings.WebDav.ServerUrl;
         Username = _settings.WebDav.Username;
         Password = _settings.WebDav.Password;
-        AutoSync = _settings.WebDav.AutoSync;
         UpdateLastSyncDisplay();
 
         SaveCommand = new DelegateCommand(Save);
@@ -112,7 +107,6 @@ public class SettingsSyncViewModel : BindableBase
         _settings.WebDav.ServerUrl = ServerUrl.Trim();
         _settings.WebDav.Username = Username.Trim();
         _settings.WebDav.Password = Password;
-        _settings.WebDav.AutoSync = AutoSync;
         _config.SaveSettings(_settings);
         _ = MessageBoxHelper.Info("WebDAV 配置已保存。");
     }
@@ -202,8 +196,10 @@ public class SettingsSyncViewModel : BindableBase
             if (result.Ok)
             {
                 UpdateLastSyncDisplay();
-                _ = MessageBoxHelper.Info(result.Message + "\n\n即将重启以应用全部配置…", "拉取配置");
-                RestartApp();
+                // 不重启直接生效：ImportConfig 写盘时触发的 SettingsSaved 已让主窗口
+                // 重读配置（热键重注册、按钮显隐、主题）；平台列表走服务重载刷新侧边栏
+                _platformService.ReloadFromDisk();
+                _ = MessageBoxHelper.Info(result.Message + "，已直接应用，无需重启。", "拉取配置");
             }
             else
             {
@@ -221,14 +217,16 @@ public class SettingsSyncViewModel : BindableBase
         }
     }
 
-    /// <summary>静默保存（不弹窗），用于操作前刷新本地配置</summary>
+    /// <summary>静默保存（不弹窗、不触发事件），用于操作前把 WebDAV 连接参数刷新到磁盘供服务读取。
+    /// 必须读磁盘最新配置只改 WebDav 三项：_settings 是本页构造时的快照，全覆盖写盘会把
+    /// 其他设置页刚保存的改动（如外观页按钮显隐）静默回滚——点"上传云端"传出去的就是旧值</summary>
     private void SaveSilently()
     {
-        _settings.WebDav.ServerUrl = ServerUrl.Trim();
-        _settings.WebDav.Username = Username.Trim();
-        _settings.WebDav.Password = Password;
-        _settings.WebDav.AutoSync = AutoSync;
-        _config.SaveSettings(_settings);
+        var latest = _config.LoadSettings();
+        latest.WebDav.ServerUrl = ServerUrl.Trim();
+        latest.WebDav.Username = Username.Trim();
+        latest.WebDav.Password = Password;
+        _config.SaveSettings(latest, raiseEvent: false);
     }
 
     /// <summary>更新上次同步时间显示（读磁盘最新配置：上传/下载成功后可实时刷新）</summary>
@@ -287,19 +285,8 @@ public class SettingsSyncViewModel : BindableBase
             _ = MessageBoxHelper.Error(msg);
             return;
         }
-        _ = MessageBoxHelper.Info(msg + "，即将重启以应用全部配置…");
-        RestartApp();
-    }
-
-    /// <summary>启动新实例并关闭当前进程，确保全部配置重新加载生效</summary>
-    private static void RestartApp()
-    {
-        Task.Delay(700).ContinueWith(_ =>
-        {
-            var exe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-            if (!string.IsNullOrEmpty(exe))
-                System.Diagnostics.Process.Start(exe);
-            Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
-        });
+        // 与云端拉取一致：不重启，平台列表热刷新，其余配置经 SettingsSaved 事件生效
+        _platformService.ReloadFromDisk();
+        _ = MessageBoxHelper.Info(msg + "，已直接应用，无需重启。");
     }
 }

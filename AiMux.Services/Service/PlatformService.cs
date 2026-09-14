@@ -43,6 +43,14 @@ public class PlatformService : IPlatformService
         PlatformsChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>丢弃缓存从磁盘重读并通知刷新（云端拉取/本地导入配置后调用）</summary>
+    public void ReloadFromDisk()
+    {
+        _cache = null;
+        GetAll(); // 重新读盘填充缓存（磁盘为空时会写入默认平台）
+        PlatformsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>生成唯一平台 Id（时间戳短哈希，避免与既有 Id 冲突）</summary>
     public string GenerateId()
     {

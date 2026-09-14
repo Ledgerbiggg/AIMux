@@ -29,6 +29,10 @@ public class WebDavService : IWebDavService
     };
 
     private readonly ConfigService _config;
+
+    /// <summary>仅用于读取 WebDAV 连接参数的快照（RefreshSettings 会刷新 WebDav 段）。
+    /// 注意：严禁用它做 SaveSettings 全覆盖写盘——快照可能落后于磁盘
+    /// （期间其他设置页保存/云端导入都会写盘），覆盖会静默回滚那些改动</summary>
     private readonly AppSettings _settings;
 
     /// <summary>远程配置文件名（.aimux 打包格式，与本地导出/导入一致）</summary>
@@ -186,10 +190,12 @@ public class WebDavService : IWebDavService
                 return new WebDavResult { Ok = false, Message = msg };
             }
 
-            // 4. 记录同步时间（raiseEvent=false：不触发 SettingsSaved，
-            // 否则「保存→自动同步→写时间→再触发同步」会无限递归上传）
-            _settings.WebDav.LastSyncTime = DateTime.UtcNow.ToString("o");
-            _config.SaveSettings(_settings, raiseEvent: false);
+            // 4. 记录同步时间。必须读磁盘最新配置回写，绝不能用 _settings 构造快照：
+            // 上传期间用户可能在其他设置页保存过（如按钮显隐），旧快照全覆盖会把
+            // 那些改动静默回滚（raiseEvent=false 仅为防「保存→自动同步→写时间→再同步」递归）
+            var latest = _config.LoadSettings();
+            latest.WebDav.LastSyncTime = DateTime.UtcNow.ToString("o");
+            _config.SaveSettings(latest, raiseEvent: false);
 
             return new WebDavResult { Ok = true, Message = "配置已成功上传到 WebDAV 服务器" };
         }
@@ -295,9 +301,12 @@ public class WebDavService : IWebDavService
             if (!ok)
                 return new WebDavResult { Ok = false, Message = importMsg };
 
-            // 5. 记录同步时间（同上传：全覆盖写盘 + 不触发递归同步）
-            _settings.WebDav.LastSyncTime = DateTime.UtcNow.ToString("o");
-            _config.SaveSettings(_settings, raiseEvent: false);
+            // 5. 记录同步时间。必须读磁盘最新配置回写：上一步 ImportConfig 刚把云端配置
+            // 写入磁盘（含 Ui/Hotkeys 等），若用 _settings 构造快照覆盖会立刻把云端配置
+            // 回滚成启动时的旧值，重启后表现为「拉取了却没生效」（raiseEvent=false 防递归）
+            var latest = _config.LoadSettings();
+            latest.WebDav.LastSyncTime = DateTime.UtcNow.ToString("o");
+            _config.SaveSettings(latest, raiseEvent: false);
 
             return new WebDavResult { Ok = true, Message = "远程配置已成功拉取并应用" };
         }

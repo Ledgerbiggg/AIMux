@@ -104,12 +104,20 @@ public partial class MainWindow : FluentWindow
         _trayService.ExitRequested += (_, _) => ExitApp();
         _platformService.PlatformsChanged += (_, _) => _vm.RefreshPlatforms();
 
-        // 设置保存后（热键/外观/窗口行为等）重新加载、重注册热键并刷新按钮显隐
+        // 设置保存后（热键/外观/窗口行为等）重新加载、重注册热键并刷新按钮显隐。
+        // 云端拉取/本地导入也经此热生效（不再重启）：主题同步应用，右上角图标跟随
         _config.SettingsSaved += (_, _) =>
         {
             _settings = _config.LoadSettings();
             RegisterHotkey();
             ApplyButtonVisibility();
+            try
+            {
+                SettingsAppearanceViewModel.ApplyTheme(_settings.Theme);
+                if (ThemeToggleIcon != null)
+                    ThemeToggleIcon.Text = _settings.Theme.Equals("Dark", StringComparison.OrdinalIgnoreCase) ? "🌙" : "☀";
+            }
+            catch (Exception ex) { LoggerHelper.Error("热应用主题失败", ex); }
         };
 
         ApplySavedWindowState();

@@ -55,7 +55,7 @@ public class SettingsViewModel : BindableBase
         GeneralVm = new SettingsGeneralViewModel(config, platformService);
         HotkeyVm = new SettingsHotkeyViewModel(config, hotkeyManager);
         AppearanceVm = new SettingsAppearanceViewModel(config);
-        SyncVm = new SettingsSyncViewModel(config, webDavService);
+        SyncVm = new SettingsSyncViewModel(config, webDavService, platformService);
         AboutVm = new SettingsAboutViewModel();
 
         _selectedNav = NavItems[0];

@@ -200,38 +200,9 @@ public partial class App : PrismApplication
     /// 静默启动"闪一下再隐藏"的真正元凶（InitializeShell 默认实现并不 Show，Show 藏在这一步）。
     /// 只拦 InitializeShell 不够：隐藏的窗口会被这里的 Show 强行拉出来闪一下，
     /// 随后又被 Visibility=Hidden 压回隐藏。静默启动时必须连这里一起跳过</summary>
-    /// <summary>AutoSync 防重入标志：上传进行中不重复触发（Interlocked 保证线程安全）</summary>
-    private static int _autoSyncBusy;
-
     protected override void OnInitialized()
     {
-        // AutoSync：用户勾选「保存设置时自动上传 WebDAV」后，任何设置保存（热键/外观/通用/
-        // 同步页）落盘都会自动把最新配置同步到云端。挂载必须在静默启动 return 之前（与窗口显隐无关）。
-        // 防递归已由链路保证：上传成功记录同步时间是静默写盘（raiseEvent=false，不再触发本事件）
         var config = Container.Resolve<ConfigService>();
-        var webDav = Container.Resolve<IWebDavService>();
-        config.SettingsSaved += (_, _) =>
-        {
-            var s = config.LoadSettings();
-            if (!s.WebDav.AutoSync || string.IsNullOrWhiteSpace(s.WebDav.ServerUrl)) return;
-            if (Interlocked.Exchange(ref _autoSyncBusy, 1) == 1) return; // 上传中，跳过本次
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var result = await webDav.UploadAsync();
-                    LoggerHelper.Info($"自动同步 WebDAV：{(result.Ok ? "成功" : result.Message)}");
-                }
-                catch (Exception ex)
-                {
-                    LoggerHelper.Error("自动同步 WebDAV 异常", ex);
-                }
-                finally
-                {
-                    Interlocked.Exchange(ref _autoSyncBusy, 0);
-                }
-            });
-        };
 
         if (config.LoadSettings().Behavior.StartHidden)
         {
