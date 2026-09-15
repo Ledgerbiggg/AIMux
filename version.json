@@ -1,5 +1,5 @@
 {
-  "version":  "0.1.6",
-  "notes":  "## v0.1.6 更新说明\n> 生成时间：2026-09-14 21:19\n\n### ✨ 新功能\n- 云端拉取 / 本地导入配置后不再重启应用，配置直接生效：热键、导航条按钮显隐、主题、平台列表即时刷新\n\n### 🐛 问题修复\n- 修复点「上传云端 / 拉取配置」前的隐式保存会用旧快照回滚其他设置页刚保存的改动（如按钮显隐），导致传出旧配置的问题\n\n### 🧹 杂项\n- 移除「保存设置时自动上传 WebDAV」（自动同步）功能，同步只保留手动上传/拉取，云端内容完全由你手动控制\n\n### 📝 文档\n- 新增需求工作流（requirements）与 implement-requirement 技能\n\n### 其他\n- 统一指令命名并精简 Makefile\n\n共 5 条更新。",
-  "url":  "https://github.com/Ledgerbiggg/AIMux/releases/latest"
+    "version":  "0.1.7",
+    "notes":  "## v0.1.7 更新说明\n> 生成时间：2026-09-15 22:22\n\n### 🐛 问题修复\n- 修复升级或重装时安装程序无法自动关闭本程序、弹出「Setup was unable to automatically close all applications」的问题：主窗口的「关闭到托盘」会拦截关闭请求，自动更新时进程实际并未退出、安装包无法替换 exe；现统一走应用级退出，并响应安装程序发来的退出请求\n- 修复设置页「重启应用」不生效的问题：退出同样被「关闭到托盘」拦截而取消，旧进程未退出、新实例又被单实例逻辑挡回\n\n### 🧹 杂项\n- Makefile 统一 dev / start / watch 目标\n\n共 2 条提交。",
+    "url":  "https://github.com/Ledgerbiggg/AIMux/releases/latest"
 }
