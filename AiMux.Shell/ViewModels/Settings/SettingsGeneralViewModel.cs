@@ -226,7 +226,9 @@ public class SettingsGeneralViewModel : BindableBase
             var exe = Process.GetCurrentProcess().MainModule?.FileName;
             if (!string.IsNullOrEmpty(exe))
                 Process.Start(exe);
-            Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
+            // 必须走 App.RequestShutdown：直接 Application.Current.Shutdown() 会被主窗口
+            // 的"关闭到托盘"拦截取消，旧进程退不掉、新实例又被单实例逻辑挡回，重启形同无效
+            Application.Current.Dispatcher.Invoke(App.RequestShutdown);
         });
     }
 }

@@ -186,6 +186,7 @@ public partial class MainWindow : FluentWindow
 
     /// <summary>窗口消息处理：WM_HOTKEY 由 HotkeyManager 经 HotkeyPressed 事件分发到对应动作，
     /// 这里只标记已处理（分发逻辑在 OnHotkeyPressed 中按 Action 区分，避免 Alt+W 误触发开关窗口）。
+    /// 还处理单实例唤出与安装程序请求退出。
     /// 注意：顶部缩放不在本 hook 处理——WPF-UI 的 WindowChrome hook 注册在先、先执行并截断消息，
     /// 这里收不到 WM_NCHITTEST，顶部命中统一由 SubclassWndProc（子类化）处理</summary>
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -198,6 +199,13 @@ public partial class MainWindow : FluentWindow
         {
             handled = true;
             ToggleWindow();
+        }
+        else if (msg == App.WmExitForUpdate)
+        {
+            handled = true;
+            // 安装程序请求退出，复用托盘"退出"路径（必须先置 IsExiting 再退出，
+            // 否则主窗口会把关闭拦回托盘，exe 仍被占用导致安装失败）
+            ExitApp();
         }
         return IntPtr.Zero;
     }
@@ -662,12 +670,13 @@ public partial class MainWindow : FluentWindow
     private void MainWindow_OnClosing(object? sender, CancelEventArgs e)
     {
         // 调试：记录主窗口收到关闭请求时的调用来源
-        AiMux.Common.Logger.LoggerHelper.Info($"MainWindow_OnClosing 触发, _closingToTray={_closingToTray}\n{Environment.StackTrace}");
-        if (_closingToTray)
-        {
-            e.Cancel = true;
-            Hide();
-        }
+        AiMux.Common.Logger.LoggerHelper.Info($"MainWindow_OnClosing 触发, _closingToTray={_closingToTray}, IsExiting={App.IsExiting}\n{Environment.StackTrace}");
+        // 应用级退出（托盘"退出"、更新安装）必须放行：e.Cancel 会连带取消
+        // Application.Shutdown，导致进程退不掉、exe 被占用，安装时报"无法自动关闭应用程序"
+        if (App.IsExiting || !_closingToTray)
+            return;
+        e.Cancel = true;
+        Hide();
     }
 
     private void MainWindow_OnClosed(object? sender, EventArgs e)
@@ -738,7 +747,7 @@ public partial class MainWindow : FluentWindow
         _closingToTray = false;
         SaveWindowState();
         _trayService.Hide();
-        Application.Current.Shutdown();
+        App.RequestShutdown();
     }
 
     /// <summary>按设置应用主界面导航条按钮显隐（外观设置页可配置）。
