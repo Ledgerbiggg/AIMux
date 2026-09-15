@@ -3,8 +3,9 @@
 # .NET 9 + WPF + Prism.Unity + WPF-UI 4.0 + WebView2 + Hardcodet.NotifyIcon
 #
 # 常用:
-#   make dev       - 开发：杀进程 + 构建(Debug) + 运行
-#   make watch     - 热部署：启动后监听源码变化，自动重建并重启（按 Q 退出）
+#   make dev       - 开发启动（热部署）：监听源码变化，自动重建并重启（按 Q 退出）
+#                    四仓库统一命令：ledger/AiMux/CryptoWidget/Dsh 均为 make dev，无需分别记忆
+#   make start     - 开发运行：杀进程 + 构建(Debug) + 运行（不监听，原 make dev 的行为）
 #   make release   - 发布（云端出包）：升版本 + 写 notes + 提交 + 推送；GitHub 自动打包发 Release
 #                    用法: make release NOTES="本次更新内容"
 #
@@ -26,7 +27,7 @@ CONFIG   ?= Debug
 BUMP_PART ?= patch
 
 # 默认目标：热部署（直接 make 即进入监听重建模式，修改代码自动重启）
-.DEFAULT_GOAL := watch
+.DEFAULT_GOAL := dev
 
 # 杀掉残留的 AiMux 进程（避免锁文件导致构建失败 / 单实例 Mutex 抢占）
 .PHONY: kill
@@ -52,15 +53,19 @@ run:
 		echo "[run] 未找到 $(APP_PATH)，请先执行: make build"; \
 	)
 
-# 一键启动：杀进程 → 构建 → 运行
+# 统一开发启动（热部署）：与 ledger-service 对齐，四个仓库统一敲 make dev 即启动开发
 .PHONY: dev
-dev: build run
-	@echo "[dev] 已启动 AiMux"
-
-# 热部署：启动后监听源码变化，自动重新构建并重启应用（按 Q 退出）
-.PHONY: watch
-watch:
+dev:
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev_watch.ps1
+
+# watch 为 dev 的别名，兼容旧习惯
+.PHONY: watch
+watch: dev
+
+# 一键运行（不监听）：杀进程 → 构建 → 运行
+.PHONY: start
+start: build run
+	@echo "[start] 已启动 AiMux"
 
 # 发布（云端出包）：升版本号 + 写 version.json notes + 提交 + 推送。
 # 真正的打包与发 Release 由 GitHub 工作流(build.yml)完成。
@@ -74,11 +79,12 @@ release:
 help:
 	@echo "AiMux - AI 聊天平台聚合桌面客户端"
 	@echo.
-	@echo "默认目标: make = make watch（热部署，Q 退出）"
+	@echo "默认目标: make = make dev（热部署，Q 退出）"
 	@echo.
 	@echo "可用目标:"
-	@echo "  watch      - 热部署：启动后监听源码，修改自动重建重启（按 Q 退出）"
-	@echo "  dev        - 一键启动：杀进程 + 构建 + 运行"
+	@echo "  dev        - 热部署：启动后监听源码，修改自动重建重启（按 Q 退出）"
+	@echo "  watch      - dev 的别名"
+	@echo "  start      - 一键运行：杀进程 + 构建 + 运行（不监听）"
 	@echo "  build      - 构建解决方案（Debug）"
 	@echo "  run        - 启动主程序（需先 build）"
 	@echo "  kill       - 杀掉残留 AiMux 进程（修复构建权限问题）"
