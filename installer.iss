@@ -70,7 +70,11 @@ Filename: "{app}\{#MyAppExeName}"; Description: "立即启动 {#MyAppName}"; Fla
 // 背景：本程序托盘常驻，"点 ×" 是隐藏到托盘而非退出，主窗口会拦截 WM_CLOSE，
 // Inno 的 Restart Manager 因此关不掉它，会弹「Setup was unable to automatically
 // close all applications」。
-// 这里只做一件事：taskkill 结束进程树（/T 一并结束 WebView2 等子进程）。
+// 这里只做一件事：taskkill 结束主程序进程本体。
+// ⚠️ 严禁加 /T 杀进程树：应用内更新时安装器是由主程序拉起的子进程
+// （UAC 提权后 PPID 仍指向主程序），主程序尚未退干净时 /T 的树遍历会把
+// 安装器自己一并强杀——表现为安装过程中直接闪退（手动运行安装包则无此问题）。
+// WebView2 等子进程在宿主退出后自行退出，且不锁安装目录文件，不影响覆盖安装。
 // ⚠️ 严禁改成 Exec('{app}\应用.exe', '--exit-for-update', ..., ewWaitUntilTerminated)
 // 之类的"先请应用优雅退出"：旧版本不认识该开关，会把这次启动当成正常启动并常驻
 // 托盘永不退出，安装程序将永久卡在「Preparing to Install」页面（无响应且无取消按钮）。
@@ -79,7 +83,7 @@ var
   ResultCode: Integer;
 begin
   NeedsRestart := False;
-  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM "{#MyAppExeName}"',
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM "{#MyAppExeName}"',
        '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Result := '';
 end;

@@ -347,10 +347,12 @@ public class MainViewModel : BindableBase
                 return;
             }
 
-            // 启动安装向导（UAC 提权由系统接管），随后退出主程序避免 exe 文件被占用。
+            // 经 explorer 代理启动安装向导：切断安装器与本进程的父子关系（PPID 指向
+            // explorer），避免安装器 PrepareToInstall 里 taskkill /T 杀本进程树时把安装器
+            // 自己连带杀掉。UAC 提权由系统接管，随后退出主程序释放文件占用。
             // 必须走 App.RequestShutdown：直接 Application.Current.Shutdown() 会被主窗口
             // 的关闭拦截取消，进程不退，安装程序替换 exe 失败
-            Process.Start(new ProcessStartInfo(installer) { UseShellExecute = true });
+            Process.Start("explorer.exe", $"\"{installer}\"");
             await Task.Delay(1000);
             App.RequestShutdown();
         }
